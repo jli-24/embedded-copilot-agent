@@ -1,0 +1,6 @@
+interface:
+  display_name: "Embedded Copilot Testing"
+  short_description: "Test agents, tools, retrieval, and APIs with pytest"
+  default_prompt: "Use $testing to add or review tests under tests/."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "RAG Development"
+  short_description: "Build cited PDF retrieval pipelines with Chroma"
+  default_prompt: "Use $rag-development to design or change code under rag/."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Python Backend"
+  short_description: "Build reliable FastAPI service boundaries"
+  default_prompt: "Use $python-backend to design or change code under api/."
+policy:
+  allow_implicit_invocation: true

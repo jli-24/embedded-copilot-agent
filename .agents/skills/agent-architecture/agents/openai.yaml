@@ -1,0 +1,6 @@
+interface:
+  display_name: "Agent Architecture"
+  short_description: "Design typed LangGraph multi-agent workflows"
+  default_prompt: "Use $agent-architecture to design or change code under agents/."
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Git Engineering"
+  short_description: "Apply commit and v0.x.x release conventions"
+  default_prompt: "Use $git-engineering when creating commits, branches, tags, or releases."
+policy:
+  allow_implicit_invocation: true
