@@ -23,6 +23,10 @@ Do not begin v0.1.0 implementation until the user approves the development plan.
 - Use agent-architecture for files under agents/.
 - Use rag-development for files under rag/.
 - Use python-backend for files under api/.
+- Use python-backend, agent-architecture, and testing for production clients under adapters/.
+- Use agent-architecture and testing for files under tools/.
+- Use agent-architecture, python-backend, and testing for shared contracts under models/.
+- Use python-backend and testing for configuration and logging under core/.
 - Use testing for files under tests/ and for all behavior changes.
 - Use embedded-c-knowledge for firmware, MCU, peripheral, RTOS, and embedded debugging claims.
 - Use git-engineering for commits, tags, versions, and releases.
@@ -31,7 +35,7 @@ When a change spans multiple areas, use every relevant project Skill.
 
 ## Scope
 
-The first phase includes Supervisor, Knowledge, Firmware, and Debug Agents; RAG; Tool Calling; FastAPI; and unit tests. Keep v0.1.0 offline-testable by injecting model, embedding, vector-store, and device adapters.
+The first phase includes Supervisor, Knowledge, Firmware, and Debug Agents; RAG; Tool Calling; FastAPI; and unit tests. Keep v0.1.0 offline-testable by injecting model, embedding, workflow, and device adapters and by using temporary Chroma collections in tests.
 
 ## Git Conventions
 

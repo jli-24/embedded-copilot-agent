@@ -1,12 +1,12 @@
-# Embedded Copilot Agent v0.1.0 Development Plan
+# Embedded Copilot Agent v0.1.0 Development Roadmap
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking.
+> **Approval artifact:** This roadmap fixes scope, architecture, milestones, interfaces, acceptance criteria, and commit boundaries. It is not passed directly to executing-plans. After approval, create the four execution-grade plans listed under Execution Plan Decomposition; each must contain exact failing-test code, 2–5-minute steps, commands, and expected output.
 
 **Goal:** Deliver an offline-testable Embedded Copilot Agent v0.1.0 with four LangGraph agents, cited PDF RAG, typed Tool Calling, and a FastAPI query interface.
 
-**Architecture:** A small LangGraph workflow routes a typed request from Supervisor to one specialist. Knowledge uses the RAG retriever; Firmware and Debug may use retrieved context and registered tools. FastAPI is a thin boundary over the workflow. External model, embedding, vector-store, and hardware behavior is replaced with deterministic fakes in tests.
+**Architecture:** A small LangGraph workflow routes a typed request from Supervisor to one specialist. Knowledge uses the RAG retriever; Firmware and Debug may use retrieved context and registered tools. FastAPI is a thin boundary over the workflow. Production composition uses configurable OpenAI-compatible chat and embedding adapters. Tests use deterministic model and embedding fakes, temporary Chroma collections, and fake device tools.
 
-**Tech Stack:** Python 3.12, LangGraph, FastAPI, Pydantic v2, ChromaDB, PyMuPDF, pytest, HTTPX, Ruff, mypy.
+**Tech Stack:** Python 3.12, LangGraph, FastAPI, Pydantic v2, ChromaDB, PyMuPDF, langchain-openai, pytest, HTTPX, Ruff, mypy.
 
 ## Global Constraints
 
@@ -26,6 +26,7 @@
 - core/config.py: Pydantic settings.
 - core/logging.py: structured logging setup and trace context.
 - models/contracts.py: shared request, response, citation, retrieval, and error models.
+- adapters/openai.py: configurable production chat and embedding adapters.
 - agents/state.py: typed LangGraph state and route enum.
 - agents/supervisor.py: constrained route selection.
 - agents/knowledge.py: cited knowledge response node.
@@ -39,6 +40,7 @@
 - tools/contracts.py: typed tool input, output, and error models.
 - tools/registry.py: explicit tool lookup and execution.
 - api/main.py: FastAPI application and lifespan.
+- api/dependencies.py: production composition root for settings, adapters, Chroma, tools, and workflow.
 - api/schemas.py: public API contracts.
 - api/routes.py: health and query endpoints.
 - api/errors.py: exception-to-HTTP mapping.
@@ -57,9 +59,9 @@
 
 **Interfaces:**
 
-- Produce Settings with app_name, version, log_level, chroma_path, collection_name, retrieval_top_k, retrieval_score_threshold, and request_timeout_seconds.
+- Produce Settings with app_name, version, log_level, chroma_path, collection_name, embedding_model, chat_model, openai_base_url, openai_api_key, chunk_size, chunk_overlap, retrieval_top_k, retrieval_score_threshold, and request_timeout_seconds.
 
-- [ ] Write tests proving defaults equal the v0.1.0 values and invalid top-k, score threshold, or timeout values fail validation.
+- [ ] Write tests named test_settings_defaults, test_chunk_overlap_must_be_smaller_than_chunk_size, test_retrieval_values_are_bounded, and test_api_key_is_secret.
 - [ ] Run `pytest tests/core/test_config.py -q`; expect failure because core.config does not exist.
 - [ ] Add the minimum package configuration and Settings model.
 - [ ] Run the focused test, Ruff, and mypy; expect all to pass.
@@ -113,7 +115,7 @@
 - Produce index_pdf(path, collection, embedder) returning inserted and unchanged counts.
 - Produce retrieve(query, collection, embedder, top_k, score_threshold) returning RetrievedChunk records.
 
-- [ ] Write deterministic tests for page metadata, code and hexadecimal token preservation, overlap, stable identifiers, idempotent indexing, ranking, empty results, and citation fields.
+- [ ] Write deterministic tests named test_loader_keeps_page_metadata, test_chunker_preserves_code_tokens, test_chunk_ids_are_stable, test_index_is_idempotent, test_retriever_applies_threshold, and test_retriever_returns_citations.
 - [ ] Run `pytest tests/rag -q`; expect import failures.
 - [ ] Implement parsing with PyMuPDF, simple paragraph-aware chunking, direct Chroma access, and one injectable embedding callable.
 - [ ] Run RAG tests twice against a temporary Chroma directory; expect identical pass results and no duplicate chunks.
@@ -134,7 +136,7 @@
 - Produce AgentState containing request, route, routing_reason, messages, retrieved_chunks, tool_results, errors, and response.
 - Produce route_request(state, model) returning only route and routing_reason updates.
 
-- [ ] Write tests for knowledge lookup, firmware generation or review, debug or log analysis, and invalid model routing output.
+- [ ] Write tests named test_routes_knowledge_request, test_routes_firmware_request, test_routes_debug_request, and test_rejects_invalid_route.
 - [ ] Run `pytest tests/agents/test_supervisor.py -q`; expect import failure.
 - [ ] Implement constrained routing with a typed model response and a deterministic invalid-output error.
 - [ ] Run focused tests; expect all to pass without a live model.
@@ -158,9 +160,9 @@
 - Produce answer_debug(state, model, retriever, tools).
 - Each function returns a partial AgentState update and never mutates the input.
 
-- [ ] Write Knowledge tests for citations, insufficient context, and retriever errors.
-- [ ] Write Firmware tests for cited assumptions, embedded-domain constraints, and tool failure.
-- [ ] Write Debug tests for observed, cited, inferred, and assumed evidence labels.
+- [ ] Write Knowledge tests named test_knowledge_preserves_citations, test_knowledge_reports_insufficient_context, and test_knowledge_maps_retriever_error.
+- [ ] Write Firmware tests named test_firmware_labels_assumptions, test_firmware_preserves_sources, and test_firmware_maps_tool_error.
+- [ ] Write Debug tests named test_debug_labels_evidence and test_debug_does_not_promote_inference_to_observation.
 - [ ] Run `pytest tests/agents/test_knowledge.py tests/agents/test_firmware.py tests/agents/test_debug.py -q`; expect import failures.
 - [ ] Implement the three smallest specialist nodes using injected callables and shared contracts.
 - [ ] Run focused tests; expect all to pass.
@@ -179,7 +181,7 @@
 - Produce invoke(request) returning CopilotResponse.
 - Graph edges are start to Supervisor, Supervisor to exactly one specialist, then end.
 
-- [ ] Write tests for every route, citation propagation, specialist errors, invalid state, and one terminal completion per request.
+- [ ] Write tests named test_workflow_reaches_each_specialist, test_workflow_propagates_citations, test_workflow_terminates_on_specialist_error, and test_workflow_completes_once.
 - [ ] Run `pytest tests/agents/test_workflow.py -q`; expect import failure.
 - [ ] Implement the smallest acyclic LangGraph; do not add retries until a measured failure requires them.
 - [ ] Run all agent and workflow tests; expect all to pass.
@@ -204,13 +206,35 @@
 - Return answer, route, citations, and trace_id.
 - Map validation, retrieval, tool, timeout, and internal failures to stable error codes.
 
-- [ ] Write API tests for health, valid queries, citations, validation errors, workflow errors, and trace identifiers.
+- [ ] Write API tests named test_health_reports_v010, test_query_returns_citations, test_query_rejects_blank_input, test_query_maps_workflow_error, and test_query_returns_trace_id.
 - [ ] Run `pytest tests/api -q`; expect import failure.
 - [ ] Implement app lifespan, dependencies, routes, schemas, error handlers, and structured request logs.
 - [ ] Run API tests; expect all to pass with a fake workflow.
 - [ ] Commit with `feat: expose Embedded Copilot FastAPI endpoints`.
 
-### Task 8: Full Verification and v0.1.0 Release Readiness
+### Task 8: Production Adapters and Composition
+
+**Files:**
+
+- Create: adapters/__init__.py
+- Create: adapters/openai.py
+- Create: api/dependencies.py
+- Create: tests/adapters/test_openai.py
+- Create: tests/api/test_dependencies.py
+
+**Interfaces:**
+
+- Produce OpenAIChatAdapter(settings) with the typed chat interface consumed by agents.
+- Produce OpenAIEmbeddingAdapter(settings) with embed_documents and embed_query.
+- Produce build_application(settings) that composes adapters, Chroma collection, tool registry, retriever, workflow, and FastAPI dependencies.
+
+- [ ] Write tests named test_chat_adapter_uses_configured_model, test_embedding_adapter_uses_configured_model, test_secret_is_not_logged, and test_build_application_wires_real_adapters.
+- [ ] Run `pytest tests/adapters/test_openai.py tests/api/test_dependencies.py -q`; expect import failure.
+- [ ] Implement the two thin langchain-openai adapters and one composition function; do not add a provider factory or second provider.
+- [ ] Run focused adapter and dependency tests; expect all to pass without network calls.
+- [ ] Commit with `feat: compose production model and embedding adapters`.
+
+### Task 9: Full Verification and v0.1.0 Release Readiness
 
 **Files:**
 
@@ -226,7 +250,8 @@
 - [ ] Add a test that package, API health, and documented version values are all 0.1.0.
 - [ ] Run `pytest -q`; expect the complete offline suite to pass.
 - [ ] Run `ruff check .` and `mypy agents rag tools api core models`; expect no errors.
-- [ ] Run the API locally and verify health plus one fake-backed query.
+- [ ] Run the API locally and verify health plus one deterministic offline query through the production composition with patched external clients.
+- [ ] When approved credentials are available, run one optional live chat-and-embedding smoke test and record the model identifiers; absence of credentials does not invalidate the offline suite.
 - [ ] Perform requesting-code-review and resolve findings.
 - [ ] Perform verification-before-completion and record exact command results.
 - [ ] Commit with `docs: document v0.1.0 usage and verification`.
@@ -235,3 +260,14 @@
 ## Approval Checkpoint
 
 Do not execute Task 1 until the user confirms this plan and the recommended directory structure.
+
+## Execution Plan Decomposition
+
+After approval, use writing-plans to produce these separate executable plans before implementation:
+
+1. docs/superpowers/plans/2026-07-20-foundation-tools-execution.md for Tasks 1–2.
+2. docs/superpowers/plans/2026-07-20-rag-execution.md for Task 3.
+3. docs/superpowers/plans/2026-07-20-agents-workflow-execution.md for Tasks 4–6.
+4. docs/superpowers/plans/2026-07-20-api-runtime-release-execution.md for Tasks 7–9.
+
+Each execution plan must show complete failing-test code, minimal implementation code, exact commands, expected failure and pass output, and one reviewable commit per task. Do not invoke executing-plans with this roadmap.

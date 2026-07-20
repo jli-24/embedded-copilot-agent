@@ -21,8 +21,8 @@ Build retrieval as a deterministic pipeline with provenance at every stage.
 ## v0.1.0 Constraints
 
 - Accept PDF as the first ingestion format.
-- Use Chroma as the vector store behind a repository abstraction.
-- Keep embedding provider selection in configuration.
+- Use Chroma directly through an injected collection; do not add a second vector-store abstraction in v0.1.0.
+- Keep the embedding model and OpenAI-compatible base URL in configuration; add a second provider only when required.
 - Store source path, page number, chunk index, content hash, and optional section title.
 - Make ingestion repeatable without duplicate vectors.
 - Surface parsing and indexing failures explicitly; never silently skip documents.

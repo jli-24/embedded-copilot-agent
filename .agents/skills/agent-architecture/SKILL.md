@@ -13,7 +13,7 @@ Design the smallest explicit LangGraph workflow that satisfies the requested beh
 2. Give each agent one responsibility and a typed input/output boundary.
 3. Make Supervisor routing decisions explicit and testable.
 4. Keep tool schemas separate from agent prompts and validate every tool result.
-5. Model retry, timeout, empty-result, and terminal-error paths as graph behavior.
+5. Model timeout, empty-result, and terminal-error paths as graph behavior; add a bounded retry only for a documented transient failure.
 6. Add focused tests for nodes, routing, state transitions, and tool failures.
 
 ## Required v0.1.0 Architecture
