@@ -22,6 +22,26 @@ python -m venv .venv
 复制 `.env.example` 为 `.env` 后可覆盖配置。默认 `offline` 模式不需要 API
 Key、网络、硬件或串口。
 
+## Development Environment
+
+开发环境固定使用 Python 3.11。创建并激活虚拟环境后，安装项目及开发依赖：
+
+```powershell
+pip install -e ".[dev]"
+```
+
+运行测试：
+
+```powershell
+python -m pytest -q
+```
+
+检查 Python 源码能否编译：
+
+```powershell
+python -m compileall src
+```
+
 ## Run
 
 ```powershell

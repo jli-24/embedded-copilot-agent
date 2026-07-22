@@ -1,0 +1,6 @@
+-r requirements.txt
+
+pytest>=8.0,<9.0
+pytest-cov
+ruff
+black

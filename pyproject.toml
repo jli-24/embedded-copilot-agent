@@ -8,6 +8,14 @@ version = "0.1.0"
 description = "Foundation Agent System for embedded engineering assistance"
 requires-python = ">=3.11,<3.12"
 
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "ruff",
+    "black",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 
