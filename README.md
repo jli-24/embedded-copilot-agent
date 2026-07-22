@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.1.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.2.1 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -109,7 +109,22 @@ page 为 `null`。
 
 测试默认使用 Ephemeral Chroma、deterministic embedding 和 injected fakes。
 
-## v0.1 Scope
+## Embedded Copilot Architecture
+
+v0.2.1 Foundation 在现有 LangGraph Runtime Agent 架构之外提供稳定的未来扩展接口：
+
+- `BaseAgent`：统一的 typed Agent 抽象。
+- `AgentRegistry`：Agent 实例注册与查询。
+- `CapabilityRegistry`：领域能力注册框架，不包含具体 Capability。
+- `KnowledgeRetriever`：与 Chroma、FAISS 或 Embedding 无关的知识接口。
+- `AgentTask`、`AgentResult` 和 `AgentContext`：任务、结果与上下文模型。
+- `Settings`：统一的环境变量配置入口，并保留旧导入路径兼容性。
+
+这些接口当前未接入 Supervisor、Agent State 或 LangGraph Workflow，也不包含新的
+Firmware、Hardware 或 PCB 领域实现。现有 Runtime Firmware Agent 保持不变；下一版本
+计划为 v0.3.0 Foundation-based Firmware Agent 演进。
+
+## Current Runtime Scope
 
 已纳入：
 
