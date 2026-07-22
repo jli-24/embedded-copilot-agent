@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from embedded_copilot.rag.embedding import HashEmbedding
 
 
@@ -24,6 +26,3 @@ def test_hash_embedding_prefers_shared_technical_tokens() -> None:
     unrelated = embedding.embed_query("STM32 HardFault stack frame")
 
     assert _dot(query, related) > _dot(query, unrelated)
-
-
-import pytest

@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.2.1 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.3.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -120,9 +120,25 @@ v0.2.1 Foundation 在现有 LangGraph Runtime Agent 架构之外提供稳定的�
 - `AgentTask`、`AgentResult` 和 `AgentContext`：任务、结果与上下文模型。
 - `Settings`：统一的环境变量配置入口，并保留旧导入路径兼容性。
 
-这些接口当前未接入 Supervisor、Agent State 或 LangGraph Workflow，也不包含新的
-Firmware、Hardware 或 PCB 领域实现。现有 Runtime Firmware Agent 保持不变；下一版本
-计划为 v0.3.0 Foundation-based Firmware Agent 演进。
+这些接口当前未接入 Supervisor、Agent State 或 LangGraph Workflow。现有 Runtime
+Firmware Agent 保持不变。
+
+## Firmware Agent Architecture
+
+v0.3.0 Phase 1 新增独立的 Firmware Foundation pipeline：
+
+```text
+AgentTask -> FirmwareRequest -> Platform -> Template -> Generator -> Validator
+```
+
+- `embedded_copilot.agents.firmware.FirmwareAgent`：现有 LangGraph Runtime Agent，
+  保持异步接口和原有调用方式。
+- `embedded_copilot.firmware.FirmwareAgent`：新的同步 Foundation Agent，提供 Platform
+  abstraction、mock Template system、code generation interface 和 validation interface。
+
+当前生成内容仅用于离线接口验证，不是可编译或经过硬件验证的固件。本阶段不支持 LLM
+自动代码生成、真实 ESP-IDF/STM32 工程生成、真实编译、自动烧录、硬件连接、PCB 或 EDA
+处理。
 
 ## Current Runtime Scope
 
