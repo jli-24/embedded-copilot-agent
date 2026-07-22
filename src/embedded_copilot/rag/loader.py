@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import fitz
+
+from embedded_copilot.knowledge.metadata import MetadataError, load_document_metadata
+from embedded_copilot.knowledge.models import DocumentMetadata
 
 
 class DocumentLoadError(RuntimeError):
@@ -18,6 +21,7 @@ class LoadedDocument:
     filename: str
     page: int | None
     checksum: str
+    metadata: DocumentMetadata = field(default_factory=DocumentMetadata)
 
 
 def _source_name(path: Path, source_root: Path | None) -> str:
@@ -34,7 +38,12 @@ def _checksum(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _load_markdown(path: Path, source: str, checksum: str) -> list[LoadedDocument]:
+def _load_markdown(
+    path: Path,
+    source: str,
+    checksum: str,
+    metadata: DocumentMetadata,
+) -> list[LoadedDocument]:
     try:
         text = path.read_text(encoding="utf-8").strip()
     except (OSError, UnicodeError) as exc:
@@ -48,11 +57,17 @@ def _load_markdown(path: Path, source: str, checksum: str) -> list[LoadedDocumen
             filename=path.name,
             page=None,
             checksum=checksum,
+            metadata=metadata,
         )
     ]
 
 
-def _load_pdf(path: Path, source: str, checksum: str) -> list[LoadedDocument]:
+def _load_pdf(
+    path: Path,
+    source: str,
+    checksum: str,
+    metadata: DocumentMetadata,
+) -> list[LoadedDocument]:
     try:
         with fitz.open(path) as pdf:
             documents = [
@@ -62,6 +77,7 @@ def _load_pdf(path: Path, source: str, checksum: str) -> list[LoadedDocument]:
                     filename=path.name,
                     page=page_number,
                     checksum=checksum,
+                    metadata=metadata.model_copy(update={"page": page_number}),
                 )
                 for page_number, page in enumerate(pdf, start=1)
             ]
@@ -84,9 +100,15 @@ def load_document(
     root = Path(source_root) if source_root is not None else None
     source = _source_name(document_path, root)
     checksum = _checksum(document_path)
+    try:
+        metadata = load_document_metadata(document_path)
+    except MetadataError as exc:
+        raise DocumentLoadError(
+            f"Failed to load document metadata: {document_path.name}"
+        ) from exc
     suffix = document_path.suffix.lower()
     if suffix == ".pdf":
-        return _load_pdf(document_path, source, checksum)
+        return _load_pdf(document_path, source, checksum, metadata)
     if suffix in {".md", ".markdown"}:
-        return _load_markdown(document_path, source, checksum)
+        return _load_markdown(document_path, source, checksum, metadata)
     raise DocumentLoadError(f"Unsupported document type: {suffix or '<none>'}")

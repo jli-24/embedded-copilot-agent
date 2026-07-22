@@ -1,0 +1,7 @@
+{
+  "chip": "STM32F103",
+  "manufacturer": "STMicroelectronics",
+  "category": "MCU",
+  "chapter": "SPI",
+  "document_type": "reference"
+}

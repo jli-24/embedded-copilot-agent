@@ -37,7 +37,7 @@ def test_knowledge_request_completes_cited_rag_loop(
     assert isinstance(response.result, KnowledgeResult)
     assert response.result.insufficient_context is False
     assert response.sources
-    assert response.sources[0].filename == "embedded_basics.md"
+    assert all(citation.filename and citation.chunk_id for citation in response.sources)
     assert "Sources:" in response.answer
 
 

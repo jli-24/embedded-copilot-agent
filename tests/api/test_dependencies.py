@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 
 import chromadb
@@ -98,3 +99,30 @@ def test_runtime_fails_when_no_supported_document_can_be_loaded(
             _settings(tmp_path, knowledge_dir),
             chroma_client=chromadb.EphemeralClient(),
         )
+
+
+def test_runtime_uses_hybrid_retrieval_to_exclude_other_chips(
+    tmp_path: Path,
+) -> None:
+    knowledge_dir = tmp_path / "knowledge"
+    knowledge_dir.mkdir()
+    for filename, chip in (
+        ("a_stm32.md", "STM32F103"),
+        ("z_esp32.md", "ESP32-S3"),
+    ):
+        path = knowledge_dir / filename
+        path.write_text("# SPI\n\nSynchronous peripheral transfer guidance.", encoding="utf-8")
+        (knowledge_dir / f"{filename}.metadata.json").write_text(
+            json.dumps({"chip": chip, "chapter": "SPI"}),
+            encoding="utf-8",
+        )
+
+    runtime = build_runtime(
+        _settings(tmp_path, knowledge_dir),
+        chroma_client=chromadb.EphemeralClient(),
+    )
+    response = asyncio.run(
+        runtime.service.chat("ESP32-S3 SPI knowledge", trace_id="trace-hybrid")
+    )
+
+    assert [citation.filename for citation in response.sources] == ["z_esp32.md"]

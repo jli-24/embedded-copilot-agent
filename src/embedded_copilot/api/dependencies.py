@@ -14,6 +14,7 @@ from embedded_copilot.agents.firmware import FirmwareAgent
 from embedded_copilot.agents.knowledge import KnowledgeAgent
 from embedded_copilot.agents.workflow import build_workflow
 from embedded_copilot.rag.embedding import EmbeddingProvider, HashEmbedding
+from embedded_copilot.rag.hybrid_retriever import HybridRetriever
 from embedded_copilot.rag.index import index_chunks
 from embedded_copilot.rag.loader import DocumentLoadError, LoadedDocument, load_document
 from embedded_copilot.rag.retriever import ChromaRetriever
@@ -118,7 +119,8 @@ def build_runtime(
         embedding,
         active_sources=active_sources,
     )
-    retriever = ChromaRetriever(collection=collection, embedding=embedding)
+    vector_retriever = ChromaRetriever(collection=collection, embedding=embedding)
+    retriever = HybridRetriever(retriever=vector_retriever)
     llm = _build_llm(settings)
     document_tool = DocumentSearchTool(
         retriever=retriever,

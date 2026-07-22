@@ -1,0 +1,7 @@
+{
+  "chip": "ESP32-S3",
+  "manufacturer": "Espressif",
+  "category": "MCU",
+  "chapter": "SPI",
+  "document_type": "datasheet"
+}

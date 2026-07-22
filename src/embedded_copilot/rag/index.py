@@ -6,6 +6,7 @@ from typing import Any, Sequence
 from chromadb.api.models.Collection import Collection
 
 from embedded_copilot.rag.embedding import EmbeddingProvider
+from embedded_copilot.rag.metadata_filter import GENERIC_CHIP
 from embedded_copilot.rag.splitter import DocumentChunk
 
 
@@ -24,11 +25,20 @@ def _metadata(chunk: DocumentChunk) -> dict[str, str | int]:
         "chunk_index": chunk.chunk_index,
         "content_hash": chunk.content_hash,
         "source_checksum": chunk.source_checksum,
+        "chip": chunk.metadata.chip or GENERIC_CHIP,
     }
+    metadata.update(
+        chunk.metadata.model_dump(
+            exclude={"chip", "page"},
+            exclude_none=True,
+        )
+    )
     if chunk.page is not None:
         metadata["page"] = chunk.page
     if chunk.section is not None:
         metadata["section"] = chunk.section
+    if chunk.metadata.chapter is None and chunk.section is not None:
+        metadata["chapter"] = chunk.section
     return metadata
 
 
@@ -88,10 +98,11 @@ def index_chunks(
     if stale_ids:
         collection.delete(ids=stale_ids)
 
+    incoming_metadata = {chunk.chunk_id: _metadata(chunk) for chunk in chunks}
     changed = [
         chunk
         for chunk in chunks
-        if existing.get(chunk.chunk_id, {}).get("content_hash") != chunk.content_hash
+        if existing.get(chunk.chunk_id) != incoming_metadata[chunk.chunk_id]
     ]
     inserted = sum(chunk.chunk_id not in existing for chunk in changed)
     updated = len(changed) - inserted
@@ -101,7 +112,7 @@ def index_chunks(
         collection.upsert(
             ids=[chunk.chunk_id for chunk in changed],
             documents=[chunk.text for chunk in changed],
-            metadatas=[_metadata(chunk) for chunk in changed],
+            metadatas=[incoming_metadata[chunk.chunk_id] for chunk in changed],
             embeddings=embedding.embed_documents([chunk.text for chunk in changed]),
         )
     return IngestionReport(

@@ -58,11 +58,14 @@ class KnowledgeAgent:
         citations = [item.citation for item in tool_result.data.items]
         answer = tool_result.data.answer
         if citations:
-            source_lines = [
-                f"- {citation.filename}"
-                + (f", page {citation.page}" if citation.page is not None else "")
-                for citation in citations
-            ]
+            source_lines: list[str] = []
+            for item in tool_result.data.items:
+                source_line = f"- {item.citation.filename}"
+                if item.chapter is not None:
+                    source_line += f", chapter {item.chapter}"
+                if item.citation.page is not None:
+                    source_line += f", page {item.citation.page}"
+                source_lines.append(source_line)
             answer = f"{answer}\n\nSources:\n" + "\n".join(source_lines)
         result = KnowledgeResult(
             answer=answer,

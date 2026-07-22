@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable
 
+from embedded_copilot.knowledge.models import DocumentMetadata
 from embedded_copilot.rag.loader import LoadedDocument
 
 
@@ -19,6 +20,7 @@ class DocumentChunk:
     chunk_index: int
     content_hash: str
     source_checksum: str
+    metadata: DocumentMetadata = field(default_factory=DocumentMetadata)
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
@@ -80,11 +82,16 @@ def split_documents(
                     text=text,
                     source=document.source,
                     filename=document.filename,
-                    page=document.page,
+                    page=(
+                        document.page
+                        if document.page is not None
+                        else document.metadata.page
+                    ),
                     section=_section_title(text),
                     chunk_index=chunk_index,
                     content_hash=content_hash,
                     source_checksum=document.checksum,
+                    metadata=document.metadata,
                 )
             )
     return chunks

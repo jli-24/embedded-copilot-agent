@@ -1,0 +1,7 @@
+{
+  "chip": "STM32F103",
+  "manufacturer": "STMicroelectronics",
+  "category": "debugging",
+  "chapter": "HardFault",
+  "document_type": "debugging"
+}

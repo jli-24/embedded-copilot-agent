@@ -42,6 +42,7 @@ class RetrievedItem(ContractModel):
     chunk_id: str
     text: str
     citation: SourceCitation
+    chapter: str | None = None
 
 
 class DocumentSearchOutput(ContractModel):
@@ -139,6 +140,7 @@ class DocumentSearchTool:
                         chunk_id=chunk.chunk_id,
                         text=chunk.text,
                         citation=chunk.citation,
+                        chapter=chunk.metadata.chapter,
                     )
                     for chunk in chunks
                 ],

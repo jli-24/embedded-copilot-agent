@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from chromadb.api.models.Collection import Collection
 
+from embedded_copilot.knowledge.models import DocumentMetadata
 from embedded_copilot.rag.embedding import EmbeddingProvider
+from embedded_copilot.rag.metadata_filter import GENERIC_CHIP
 from embedded_copilot.schemas.result import SourceCitation
 
 
@@ -13,6 +15,7 @@ class RetrievedChunk:
     chunk_id: str
     text: str
     citation: SourceCitation
+    metadata: DocumentMetadata = field(default_factory=DocumentMetadata)
 
 
 class ChromaRetriever:
@@ -32,11 +35,27 @@ class ChromaRetriever:
         top_k: int,
         score_threshold: float,
     ) -> list[RetrievedChunk]:
+        return self.retrieve_filtered(
+            query,
+            top_k=top_k,
+            score_threshold=score_threshold,
+            metadata_filter=None,
+        )
+
+    def retrieve_filtered(
+        self,
+        query: str,
+        *,
+        top_k: int,
+        score_threshold: float,
+        metadata_filter: dict[str, object] | None,
+    ) -> list[RetrievedChunk]:
         if not query.strip() or self._collection.count() == 0:
             return []
         result = self._collection.query(
             query_embeddings=[self._embedding.embed_query(query)],
             n_results=min(top_k, self._collection.count()),
+            where=metadata_filter,
             include=["documents", "metadatas", "distances"],
         )
         ids = result.get("ids", [[]])[0]
@@ -56,6 +75,16 @@ class ChromaRetriever:
             if score < score_threshold:
                 continue
             source_metadata = metadata or {}
+            chip = source_metadata.get("chip")
+            document_metadata = DocumentMetadata(
+                chip=None if chip == GENERIC_CHIP else chip,
+                manufacturer=source_metadata.get("manufacturer"),
+                category=source_metadata.get("category"),
+                chapter=source_metadata.get("chapter")
+                or source_metadata.get("section"),
+                page=source_metadata.get("page"),
+                document_type=source_metadata.get("document_type"),
+            )
             citation = SourceCitation(
                 source=str(source_metadata["source"]),
                 filename=str(source_metadata["filename"]),
@@ -68,6 +97,7 @@ class ChromaRetriever:
                     chunk_id=chunk_id,
                     text=text or "",
                     citation=citation,
+                    metadata=document_metadata,
                 )
             )
         return retrieved
