@@ -104,8 +104,8 @@ def test_workflow_emits_traceable_events(
     assert all(getattr(record, "trace_id", None) == "trace-events" for record in records)
 
 
-def test_future_roadmap_packages_do_not_exist() -> None:
+def test_unapproved_future_roadmap_packages_do_not_exist() -> None:
     package_root = Path("src/embedded_copilot")
 
-    for forbidden in ("pcb", "hardware", "competition", "edge_ai", "computer_use"):
+    for forbidden in ("pcb", "competition", "edge_ai", "computer_use"):
         assert not (package_root / forbidden).exists()

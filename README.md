@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.5.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.6.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -179,6 +179,51 @@ project = FirmwareProject.model_validate_json(result.output)
 ESP-IDF/STM32 工程。本阶段不支持 LLM 直接代码生成、SDK 下载、真实编译、自动烧录、
 硬件控制、PCB 或 EDA 处理。所有工程内容都明确标记为 mock/unverified。
 
+## Hardware Design Intelligence Architecture
+
+v0.6.0 新增独立的同步 Foundation Hardware pipeline：
+
+```text
+AgentTask -> Hardware Requirement Analyzer -> Hardware Knowledge Retriever
+          -> Hardware Planner -> Hardware Validator -> AgentResult
+```
+
+`embedded_copilot.hardware.HardwareAgent` 根据自然语言或显式传入的
+`FirmwareProject` 返回结构化 `HardwarePlan` JSON。它不接入 Runtime Supervisor 或
+LangGraph，也不会自动扫描文件系统。Hardware Knowledge 必须由调用方显式注入：
+
+```python
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.hardware import (
+    HardwareAgent,
+    HardwareDocument,
+    HardwareKnowledgeRetriever,
+)
+
+documents = [
+    HardwareDocument(
+        id="camera-guide",
+        title="Authorized Camera Selection Notes",
+        category="camera",
+        vendor="Example",
+        content="Original or authorized hardware notes.",
+        metadata={"peripheral": "Camera", "component_name": "Approved module"},
+    )
+]
+agent = HardwareAgent(retriever=HardwareKnowledgeRetriever(documents))
+result = agent.run(
+    AgentTask(
+        task_id="hardware-demo",
+        task_type="hardware",
+        requirement="ESP32-S3 camera hardware plan",
+    )
+)
+```
+
+具体器件名称只来自显式 metadata 或检索文档 metadata；无证据时仅输出通用、未验证的
+组件候选。当前不支持 PCB、原理图、EDA、BOM 自动生成、Layout、Datasheet 下载、
+电气参数自动确定或真实硬件验证。
+
 ## Current Runtime Scope
 
 已纳入：
@@ -192,5 +237,5 @@ ESP-IDF/STM32 工程。本阶段不支持 LLM 直接代码生成、SDK 下载、
 - FastAPI
 - pytest
 
-未纳入：PCB、KiCad、Altium、EasyEDA、Hardware Agent、Competition Agent、
+未纳入：PCB、KiCad、Altium、EasyEDA、Runtime Hardware Agent、Competition Agent、
 Edge AI、Computer Use、自动烧录、自动硬件测试、Neo4j、MinIO 和 Milvus。
