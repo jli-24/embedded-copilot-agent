@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.7.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.8.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -266,6 +266,48 @@ result = agent.run(
 Rule Engine 是确定性、无副作用的 requirement-level evidence checker；稳定 Issue ID
 只表示同一条规则，不代表读取了真实 PCB connectivity。当前不支持 PCB 绘制、自动布线、
 原理图、EDA/KiCad/Altium 控制、Gerber、BOM、真实工程读取或硬件验证。
+
+## Knowledge Gateway Architecture
+
+v0.8.0 新增同步、确定性、离线优先的统一知识访问层：
+
+```text
+KnowledgeQuery -> KnowledgeGateway -> Local / GitHub Mock / Web Mock Providers
+               -> validation -> merge -> stable ranking -> KnowledgeResult list
+```
+
+Local Provider 只包装现有 Firmware、Hardware 和 PCB Retriever，不修改 Retriever，
+也不自动扫描文件系统。Web/GitHub Provider 默认返回空列表，只能由调用方显式注入
+exact-query 离线 fixture；它们不会访问网络、GitHub API 或读取 Token。
+
+```python
+from embedded_copilot.knowledge.gateway import (
+    KnowledgeGateway,
+    KnowledgeGatewayAdapter,
+)
+from embedded_copilot.knowledge.github import GitHubSearchProvider
+from embedded_copilot.knowledge.local import LocalKnowledgeProvider
+from embedded_copilot.knowledge.models import KnowledgeQuery, KnowledgeSource
+from embedded_copilot.knowledge.web import WebSearchProvider
+
+local = LocalKnowledgeProvider()
+gateway = KnowledgeGateway(
+    [local, GitHubSearchProvider(), WebSearchProvider()]
+)
+results = gateway.search(
+    KnowledgeQuery(
+        query="ESP32 SPI",
+        sources=[KnowledgeSource.LOCAL],
+        top_k=4,
+    )
+)
+adapter = KnowledgeGatewayAdapter(gateway, local, top_k=4)
+```
+
+每个 Provider 必须把 `KnowledgeQuery` 当作不可变输入，并最多返回 `query.top_k`
+条结果；Gateway 合并后仍会执行全局 top-k。任一 Provider 失败、修改 query、返回超量
+或 malformed result 时，Gateway 整体安全失败，不返回不可诊断的部分结果。本阶段不把
+Gateway 注入现有 Agents，也不提供真实 Web/GitHub 搜索。
 
 ## Current Runtime Scope
 
