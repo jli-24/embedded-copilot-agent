@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
+
+from embedded_copilot.agents.registry import AgentRegistry
+from embedded_copilot.core.capability import CapabilityRegistry
+from embedded_copilot.debug.agent import DebugAgent
+
+
+@runtime_checkable
+class DebugCapability(Protocol):
+    name: str
+    description: str
+    agent_name: str
+    supported_platforms: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class DebugCapabilityDescriptor:
+    name: str = "debug"
+    description: str = "Deterministic offline embedded debug intelligence."
+    agent_name: str = "DebugAgent"
+    supported_platforms: tuple[str, ...] = ("ESP32", "STM32")
+
+
+def register_debug_foundation(
+    agent_registry: AgentRegistry,
+    capability_registry: CapabilityRegistry,
+    *,
+    agent: DebugAgent | None = None,
+    capability: DebugCapability | None = None,
+) -> DebugAgent:
+    active_agent = agent if agent is not None else DebugAgent()
+    active_capability = (
+        capability if capability is not None else DebugCapabilityDescriptor()
+    )
+    agent_name = active_agent.name.strip()
+    capability_name = active_capability.name.strip()
+    if not agent_name:
+        raise ValueError("agent name must not be empty")
+    if not capability_name:
+        raise ValueError("capability name must not be empty")
+    if agent_name in agent_registry.list_agents():
+        raise ValueError(f"agent already registered: {agent_name}")
+    if capability_name in capability_registry.list_capabilities():
+        raise ValueError(f"capability already registered: {capability_name}")
+    capability_registry.register(capability_name, active_capability)
+    try:
+        agent_registry.register_agent(active_agent)
+    except Exception:
+        capability_registry.unregister(capability_name)
+        raise
+    return active_agent

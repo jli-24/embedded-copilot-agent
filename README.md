@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.9.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.10.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -358,6 +358,55 @@ envelope。
 
 当前实现不包含并行、重试、Agent loop、动态增删计划、自动知识检索、文件系统访问或
 网络访问，也不接入现有 LangGraph Workflow、`AgentState`、FastAPI route 或 HTTP schema。
+
+## Debug Intelligence Architecture
+
+v0.10.0 新增独立、同步、确定性的 Foundation Debug pipeline：
+
+```text
+AgentTask -> DebugRequirementAnalyzer -> DebugKnowledgeRetriever
+          -> DebugAnalyzer -> DebugPlanner -> DebugReport assembly
+          -> DebugValidator -> AgentResult
+```
+
+`embedded_copilot.debug.DebugAgent` 与
+`embedded_copilot.debug.agent.DebugAgent` 指向同一个同步 Foundation Agent；现有
+`embedded_copilot.agents.debug.DebugAgent` 仍是独立的异步 Runtime Agent，未被替换或接入。
+
+输入为 `AgentTask`。Requirement Analyzer 只规范化 ESP32/STM32 platform、五类 canonical
+error type 与日志行；输出为 `DebugReport` JSON，包含确定性 summary、bounded evidence、
+findings、recommendations 和不含知识正文的 provenance metadata。无法安全分类时返回错误，
+不会生成 `unknown` 成功报告。
+
+知识检索默认关闭且不会自动构造 `KnowledgeGateway`。如需知识增强，调用方必须显式注入只接收
+string query 的 `search()` 或 `retrieve()` adapter，例如：
+
+```python
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.debug import DebugAgent
+from embedded_copilot.debug.knowledge import DebugKnowledgeRetriever
+from embedded_copilot.knowledge.gateway import KnowledgeGatewayAdapter
+
+adapter = KnowledgeGatewayAdapter(gateway, local_provider)
+agent = DebugAgent(retriever=DebugKnowledgeRetriever(adapter))
+result = agent.run(
+    AgentTask(
+        task_id="debug-demo",
+        task_type="debug",
+        requirement="ESP32 task watchdog reset",
+    )
+)
+```
+
+Debug query 只包含 canonical platform、error type 和 allowlisted diagnostic keywords，不会把
+完整日志发送给知识层。知识结果只能补充来源与建议，不能在缺少输入/log signature 时独立制造
+Finding。没有知识命中时仍可生成规则报告，但会标记
+`analysis_mode="unverified_rule_based"`。
+
+该 pipeline 仅提供离线工程辅助，不调用 LLM，不访问文件系统或网络，不修改代码，不执行自动
+修复、编译、烧录，也不控制 GDB/JTAG、设备或实时硬件调试。输出不代表唯一 Root Cause，且未经
+真实构建、设备测量或硬件验证。v0.10.0 未修改 Supervisor、Runtime LangGraph、API routes、
+Tools 或 RAG，也不会自动注册到 Supervisor。
 
 ## Current Runtime Scope
 
