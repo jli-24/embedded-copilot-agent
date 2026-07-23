@@ -1,46 +1,22 @@
 from __future__ import annotations
 
-import re
-
 from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
 from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
-from embedded_copilot.firmware.exceptions import FirmwareGenerationError
+from embedded_copilot.firmware.exceptions import (
+    FirmwareAnalysisError,
+    FirmwareGenerationError,
+    FirmwareIntelligenceError,
+    FirmwareKnowledgeError,
+    FirmwarePlanningError,
+)
 from embedded_copilot.firmware.generator import FirmwareGenerator
-from embedded_copilot.firmware.models import FirmwareRequest
+from embedded_copilot.firmware.intelligence.analyzer import FirmwareRequirementAnalyzer
+from embedded_copilot.firmware.knowledge.models import FirmwareDocument
+from embedded_copilot.firmware.knowledge.retriever import FirmwareKnowledgeRetriever
+from embedded_copilot.firmware.planner.planner import FirmwarePlanner
 from embedded_copilot.firmware.validator import FirmwareValidator
-
-
-_PLATFORMS = ("ESP32", "STM32")
-_FRAMEWORKS = ("ESP-IDF", "FreeRTOS", "HAL")
-_PERIPHERALS = ("GPIO", "WiFi", "UART", "SPI", "ADC")
-
-
-def _find_first(text: str, candidates: tuple[str, ...]) -> str | None:
-    matches: list[tuple[int, str]] = []
-    for candidate in candidates:
-        match = re.search(
-            rf"(?<![A-Za-z0-9]){re.escape(candidate)}(?![A-Za-z0-9])",
-            text,
-            re.IGNORECASE,
-        )
-        if match is not None:
-            matches.append((match.start(), candidate))
-    return min(matches)[1] if matches else None
-
-
-def _find_all(text: str, candidates: tuple[str, ...]) -> list[str]:
-    matches: list[tuple[int, str]] = []
-    for candidate in candidates:
-        match = re.search(
-            rf"(?<![A-Za-z0-9]){re.escape(candidate)}(?![A-Za-z0-9])",
-            text,
-            re.IGNORECASE,
-        )
-        if match is not None:
-            matches.append((match.start(), candidate))
-    return [candidate for _, candidate in sorted(matches)]
 
 
 class FirmwareAgent(BaseAgent):
@@ -53,59 +29,100 @@ class FirmwareAgent(BaseAgent):
     def __init__(
         self,
         *,
+        analyzer: FirmwareRequirementAnalyzer | None = None,
+        retriever: FirmwareKnowledgeRetriever | None = None,
+        planner: FirmwarePlanner | None = None,
         generator: FirmwareGenerator | None = None,
         validator: FirmwareValidator | None = None,
     ) -> None:
-        self._generator = generator or FirmwareGenerator()
-        self._validator = validator or FirmwareValidator()
+        self._analyzer = analyzer if analyzer is not None else FirmwareRequirementAnalyzer()
+        self._retriever = (
+            retriever if retriever is not None else FirmwareKnowledgeRetriever()
+        )
+        self._planner = planner if planner is not None else FirmwarePlanner()
+        self._generator = generator if generator is not None else FirmwareGenerator()
+        self._validator = validator if validator is not None else FirmwareValidator()
 
     def run(self, task: AgentTask) -> AgentResult:
         try:
-            request = self._to_firmware_request(task)
+            analysis = self._analyzer.analyze(
+                task.requirement,
+                metadata=task.metadata,
+            )
+            documents = [
+                document
+                for document in self._retrieve_documents(task.requirement)
+                if (
+                    analysis.platform is None
+                    or document.platform.casefold() == analysis.platform.casefold()
+                )
+                and (
+                    analysis.framework is None
+                    or document.framework.casefold() == analysis.framework.casefold()
+                )
+            ]
+            plan = self._planner.plan(analysis, documents)
+            request = plan.to_firmware_request(
+                requirement=analysis.requirement,
+                metadata=analysis.metadata,
+            )
             generated = self._generator.generate(request)
             validation = self._validator.validate(generated)
             validation_payload = validation.model_dump(mode="json")
+            intelligence_metadata = {
+                "firmware_plan": plan.model_dump(mode="json"),
+                "retrieved_documents": [
+                    document.model_dump(mode="json") for document in documents
+                ],
+                "validation": validation_payload,
+            }
             if not validation.success:
                 return AgentResult(
                     agent_name=self.name,
                     status=AgentStatus.ERROR,
                     output="; ".join(validation.errors),
-                    metadata={"validation": validation_payload},
+                    metadata=intelligence_metadata,
                 )
             return AgentResult(
                 agent_name=self.name,
                 status=AgentStatus.SUCCESS,
                 output=generated.model_dump_json(),
-                metadata={"validation": validation_payload},
+                metadata=intelligence_metadata,
             )
-        except (FirmwareGenerationError, ValidationError, ValueError) as exc:
+        except FirmwareIntelligenceError as exc:
             return AgentResult(
                 agent_name=self.name,
                 status=AgentStatus.ERROR,
-                output=str(exc) or "firmware request failed",
+                output=self._safe_error_message(exc),
+                metadata={"error_type": type(exc).__name__},
+            )
+        except (ValidationError, ValueError) as exc:
+            return AgentResult(
+                agent_name=self.name,
+                status=AgentStatus.ERROR,
+                output="firmware request validation failed",
                 metadata={"error_type": type(exc).__name__},
             )
 
-    @staticmethod
-    def _to_firmware_request(task: AgentTask) -> FirmwareRequest:
-        platform = task.metadata.get("platform")
-        if platform is None:
-            platform = _find_first(task.requirement, _PLATFORMS)
-        if platform is None:
-            raise ValueError("firmware platform is required")
-
-        framework = task.metadata.get("framework")
-        if framework is None:
-            framework = _find_first(task.requirement, _FRAMEWORKS)
-
-        peripherals = task.metadata.get("peripherals")
-        if peripherals is None:
-            peripherals = _find_all(task.requirement, _PERIPHERALS)
-
-        return FirmwareRequest(
-            requirement=task.requirement,
-            platform=platform,
-            framework=framework,
-            peripherals=peripherals,
-            metadata=dict(task.metadata),
+    def _retrieve_documents(self, query: str) -> list[FirmwareDocument]:
+        search = getattr(self._retriever, "search", None)
+        if callable(search):
+            return list(search(query))
+        retrieve = getattr(self._retriever, "retrieve", None)
+        if callable(retrieve):
+            return list(retrieve(query))
+        raise FirmwareKnowledgeError(
+            "firmware knowledge retriever must implement search or retrieve"
         )
+
+    @staticmethod
+    def _safe_error_message(error: FirmwareIntelligenceError) -> str:
+        if isinstance(error, FirmwareAnalysisError):
+            return "firmware requirement analysis failed"
+        if isinstance(error, FirmwareKnowledgeError):
+            return "firmware knowledge retrieval failed"
+        if isinstance(error, FirmwarePlanningError):
+            return "firmware planning failed: platform is required"
+        if isinstance(error, FirmwareGenerationError):
+            return "firmware code generation failed"
+        return "firmware intelligence pipeline failed"

@@ -12,6 +12,7 @@ TemplateBinding = tuple[str, str, str]
 _DEFAULT_BINDINGS: dict[tuple[str, str], TemplateBinding] = {
     ("esp32", "gpio"): ("esp32_gpio", "main.c", "C"),
     ("esp32", "wifi"): ("esp32_wifi", "wifi.c", "C"),
+    ("esp32", "camera"): ("esp32_camera", "camera.c", "C"),
     ("stm32", "uart"): ("stm32_uart", "main.c", "C"),
 }
 

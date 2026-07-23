@@ -48,6 +48,21 @@ def test_generator_adds_main_scaffold_for_wifi_only() -> None:
     assert [file.filename for file in generated.files] == ["main.c", "wifi.c"]
 
 
+def test_generator_creates_camera_mock_component() -> None:
+    generated = FirmwareGenerator().generate(
+        FirmwareRequest(
+            requirement="Camera",
+            platform="ESP32",
+            framework="ESP-IDF",
+            peripherals=["Camera"],
+        )
+    )
+
+    assert [file.filename for file in generated.files] == ["main.c", "camera.c"]
+    assert "mock" in generated.files[1].content.lower()
+    assert "unverified" in generated.files[1].content.lower()
+
+
 @pytest.mark.parametrize(
     "firmware_request",
     [

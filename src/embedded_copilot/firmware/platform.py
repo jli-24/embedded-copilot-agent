@@ -40,7 +40,7 @@ def _validate_request(
 class ESP32Platform:
     name = "ESP32"
     _FRAMEWORKS = ("ESP-IDF", "FreeRTOS")
-    _PERIPHERALS = ("GPIO", "WiFi", "SPI")
+    _PERIPHERALS = ("GPIO", "WiFi", "SPI", "Camera")
     _FEATURES = (name, *_FRAMEWORKS, *_PERIPHERALS)
 
     def supported_features(self) -> tuple[str, ...]:

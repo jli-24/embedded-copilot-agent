@@ -4,6 +4,7 @@ from __future__ import annotations
 GPIO_TEMPLATE = """/* Mock unverified ESP32 GPIO firmware. */\nint main(void) { return 0; }\n"""
 ESP32_MAIN_TEMPLATE = """/* Mock unverified ESP32 project entry. */\nint main(void) { return 0; }\n"""
 WIFI_TEMPLATE = """/* Mock unverified ESP32 WiFi component. */\nvoid wifi_mock_init(void) {}\n"""
+CAMERA_TEMPLATE = """/* Mock unverified ESP32 Camera component. */\nvoid camera_mock_init(void) {}\n"""
 UART_TEMPLATE = """/* Mock unverified STM32 UART firmware. */\nint main(void) { return 0; }\n"""
 
 
@@ -33,5 +34,6 @@ def create_default_template_manager() -> TemplateManager:
     manager.register_template("esp32_main", ESP32_MAIN_TEMPLATE)
     manager.register_template("esp32_gpio", GPIO_TEMPLATE)
     manager.register_template("esp32_wifi", WIFI_TEMPLATE)
+    manager.register_template("esp32_camera", CAMERA_TEMPLATE)
     manager.register_template("stm32_uart", UART_TEMPLATE)
     return manager

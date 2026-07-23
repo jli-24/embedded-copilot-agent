@@ -12,7 +12,13 @@ from embedded_copilot.firmware.models import (
     GeneratedFile,
     ValidationResult,
 )
-from embedded_copilot.firmware.exceptions import FirmwareGenerationError
+from embedded_copilot.firmware.exceptions import (
+    FirmwareAnalysisError,
+    FirmwareGenerationError,
+    FirmwareIntelligenceError,
+    FirmwareKnowledgeError,
+    FirmwarePlanningError,
+)
 from embedded_copilot.firmware.generator import FirmwareGenerator
 from embedded_copilot.firmware.platform import ESP32Platform, STM32Platform
 from embedded_copilot.firmware.validator import FirmwareValidator
@@ -20,11 +26,15 @@ from embedded_copilot.firmware.validator import FirmwareValidator
 __all__ = [
     "ESP32Platform",
     "FirmwareAgent",
+    "FirmwareAnalysisError",
     "FirmwareCapability",
     "FirmwareCapabilityDescriptor",
     "FirmwareGenerationError",
     "FirmwareGenerator",
     "FirmwareRequest",
+    "FirmwareIntelligenceError",
+    "FirmwareKnowledgeError",
+    "FirmwarePlanningError",
     "FirmwareValidator",
     "GeneratedCode",
     "GeneratedFile",

@@ -17,6 +17,7 @@ def test_esp32_platform_describes_and_validates_capabilities() -> None:
         "GPIO",
         "WiFi",
         "SPI",
+        "Camera",
     )
     assert platform.validate_request(
         FirmwareRequest(

@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.3.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.4.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -125,20 +125,39 @@ Firmware Agent 保持不变。
 
 ## Firmware Agent Architecture
 
-v0.3.0 Phase 1 新增独立的 Firmware Foundation pipeline：
+v0.4.0 在 v0.3.0 Firmware Foundation 上增加确定性的 Firmware Intelligence
+pipeline：
 
 ```text
-AgentTask -> FirmwareRequest -> Platform -> Template -> Generator -> Validator
+AgentTask -> Requirement Analyzer -> Knowledge Retriever -> Firmware Planner
+          -> FirmwareGenerator -> FirmwareValidator -> AgentResult
 ```
 
 - `embedded_copilot.agents.firmware.FirmwareAgent`：现有 LangGraph Runtime Agent，
   保持异步接口和原有调用方式。
 - `embedded_copilot.firmware.FirmwareAgent`：新的同步 Foundation Agent，提供 Platform
-  abstraction、mock Template system、code generation interface 和 validation interface。
+  abstraction、Firmware Knowledge retrieval、deterministic planning、mock Template system、
+  code generation interface 和 validation interface。
+
+Firmware Agent 不会自动读取本地文件。调用方可以显式构建离线知识检索器：
+
+```python
+from embedded_copilot.firmware import FirmwareAgent
+from embedded_copilot.firmware.knowledge import (
+    FirmwareChunker,
+    FirmwareDocumentLoader,
+    FirmwareKnowledgeRetriever,
+)
+
+documents = FirmwareDocumentLoader().load("knowledge/docs")
+chunks = FirmwareChunker().chunk(documents)
+agent = FirmwareAgent(retriever=FirmwareKnowledgeRetriever(chunks))
+```
 
 当前生成内容仅用于离线接口验证，不是可编译或经过硬件验证的固件。本阶段不支持 LLM
-自动代码生成、真实 ESP-IDF/STM32 工程生成、真实编译、自动烧录、硬件连接、PCB 或 EDA
-处理。
+直接代码生成、真实 ESP-IDF/STM32 工程生成、真实编译、自动烧录、硬件控制、PCB 或
+EDA 处理。Retriever 与 Planner 只能提供知识依据和模块建议，代码仍由确定性 mock
+`FirmwareGenerator` 生成。
 
 ## Current Runtime Scope
 
