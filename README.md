@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.6.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.7.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -221,8 +221,51 @@ result = agent.run(
 ```
 
 具体器件名称只来自显式 metadata 或检索文档 metadata；无证据时仅输出通用、未验证的
-组件候选。当前不支持 PCB、原理图、EDA、BOM 自动生成、Layout、Datasheet 下载、
+组件候选。Hardware pipeline 不生成 PCB、原理图、EDA、BOM、Layout，不下载 Datasheet，且不执行
 电气参数自动确定或真实硬件验证。
+
+## PCB Design Intelligence Architecture
+
+v0.7.0 新增独立的同步 Foundation PCB requirement review pipeline：
+
+```text
+AgentTask -> PCB Requirement Analyzer -> PCB Knowledge Retriever
+          -> PCB Rule Engine -> PCB Reviewer -> PCB Validator -> AgentResult
+```
+
+`embedded_copilot.pcb.PCBAgent` 接受自然语言 PCB 描述，或通过
+`AgentTask.metadata["hardware_plan"]` 接受 `HardwarePlan` 实例/JSON-compatible dict，
+返回结构化 `PCBReviewReport` JSON。知识文档必须由调用方显式注入：
+
+```python
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.pcb import (
+    PCBAgent,
+    PCBKnowledgeRetriever,
+    PCBRuleDocument,
+)
+
+documents = [
+    PCBRuleDocument(
+        id="authorized-layout-notes",
+        title="Authorized Layout Review Notes",
+        category="communication",
+        content="Original or authorized PCB review guidance.",
+    )
+]
+agent = PCBAgent(retriever=PCBKnowledgeRetriever(documents))
+result = agent.run(
+    AgentTask(
+        task_id="pcb-demo",
+        task_type="pcb",
+        requirement="ESP32 camera SPI PCB review",
+    )
+)
+```
+
+Rule Engine 是确定性、无副作用的 requirement-level evidence checker；稳定 Issue ID
+只表示同一条规则，不代表读取了真实 PCB connectivity。当前不支持 PCB 绘制、自动布线、
+原理图、EDA/KiCad/Altium 控制、Gerber、BOM、真实工程读取或硬件验证。
 
 ## Current Runtime Scope
 
@@ -237,5 +280,5 @@ result = agent.run(
 - FastAPI
 - pytest
 
-未纳入：PCB、KiCad、Altium、EasyEDA、Runtime Hardware Agent、Competition Agent、
+未纳入：Runtime PCB Agent、KiCad、Altium、EasyEDA、Runtime Hardware Agent、Competition Agent、
 Edge AI、Computer Use、自动烧录、自动硬件测试、Neo4j、MinIO 和 Milvus。

@@ -107,5 +107,5 @@ def test_workflow_emits_traceable_events(
 def test_unapproved_future_roadmap_packages_do_not_exist() -> None:
     package_root = Path("src/embedded_copilot")
 
-    for forbidden in ("pcb", "competition", "edge_ai", "computer_use"):
+    for forbidden in ("competition", "edge_ai", "computer_use"):
         assert not (package_root / forbidden).exists()
