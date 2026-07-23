@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.8.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.9.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -308,6 +308,56 @@ adapter = KnowledgeGatewayAdapter(gateway, local, top_k=4)
 条结果；Gateway 合并后仍会执行全局 top-k。任一 Provider 失败、修改 query、返回超量
 或 malformed result 时，Gateway 整体安全失败，不返回不可诊断的部分结果。本阶段不把
 Gateway 注入现有 Agents，也不提供真实 Web/GitHub 搜索。
+
+## Supervisor Foundation Architecture
+
+v0.9.0 新增独立的同步、确定性 Foundation Supervisor pipeline：
+
+```text
+AgentTask -> SupervisorRequirementAnalyzer -> SupervisorPlanner
+          -> AgentDispatcher
+          -> FirmwareAgent -> HardwareAgent -> PCBAgent
+          -> SupervisorResultAggregator -> AgentResult
+```
+
+新 Supervisor 只负责规则分析、固定顺序规划、本地显式注册、顺序调度、类型化
+handoff 和结果聚合。它不调用 LLM，也不会自动查询 `KnowledgeGateway`：
+
+```python
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.supervisor import SupervisorAgent
+
+result = SupervisorAgent().run(
+    AgentTask(
+        task_id="system-demo",
+        task_type="system_design",
+        requirement="ESP32-S3 camera firmware, hardware and PCB design",
+    )
+)
+```
+
+也可以从 `embedded_copilot.supervisor.agent` 导入同一个 `SupervisorAgent`。现有
+`embedded_copilot.agents.supervisor` 仍是 LangGraph Runtime routing module，导入路径
+和行为保持不变，两者不会互相 shadow。
+
+Dispatcher 在每次调用前创建包含嵌套 metadata 的独立深拷贝，并生成
+`<parent_task_id>:<agent_name>` 子任务 ID。领域 Agent 对任务副本的修改不会反向写回
+原始 `AgentTask`、`SupervisorTask`、`SupervisorPlan`，也不会污染后续 Agent。
+
+成功输出按以下契约重新验证并通过 JSON-compatible 独立副本传递：
+
+- `FirmwareProject` 从 Firmware handoff 到 Hardware。
+- `HardwarePlan` 从 Hardware handoff 到 PCB。
+- `PCBReviewReport` 在 PCB 完成时验证。
+
+malformed `SUCCESS` 会被转换为安全的 `SupervisorDispatchError` 结果，不参与 handoff；
+既定计划中的后续 Agent 仍从原始 request 继续执行。任一领域任务、dispatch 或 handoff
+失败时，顶层状态为 `AgentStatus.ERROR`，但 `output` 仍保留可解析的完整
+`SupervisorResult`，其中包含按计划排序的 completed、failed 和完整 `AgentResult`
+envelope。
+
+当前实现不包含并行、重试、Agent loop、动态增删计划、自动知识检索、文件系统访问或
+网络访问，也不接入现有 LangGraph Workflow、`AgentState`、FastAPI route 或 HTTP schema。
 
 ## Current Runtime Scope
 
