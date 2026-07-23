@@ -62,3 +62,27 @@ def test_planner_requires_platform() -> None:
 
     with pytest.raises(FirmwarePlanningError, match="platform"):
         FirmwarePlanner().plan(analysis, [])
+
+
+def test_planner_propagates_normalized_project_name() -> None:
+    analysis = FirmwareRequirementAnalyzer().analyze(
+        "ESP32 GPIO",
+        metadata={"project_name": " sensor_node "},
+    )
+
+    plan = FirmwarePlanner().plan(analysis, [])
+    request = plan.to_firmware_request(requirement=analysis.requirement)
+
+    assert plan.project_name == "sensor_node"
+    assert request.metadata["project_name"] == "sensor_node"
+
+
+@pytest.mark.parametrize("project_name", ["", "   ", 42])
+def test_planner_rejects_invalid_project_name(project_name: object) -> None:
+    analysis = FirmwareRequirementAnalyzer().analyze(
+        "ESP32 GPIO",
+        metadata={"project_name": project_name},
+    )
+
+    with pytest.raises(FirmwarePlanningError, match="project_name"):
+        FirmwarePlanner().plan(analysis, [])

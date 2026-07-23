@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.4.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.5.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -125,19 +125,20 @@ Firmware Agent 保持不变。
 
 ## Firmware Agent Architecture
 
-v0.4.0 在 v0.3.0 Firmware Foundation 上增加确定性的 Firmware Intelligence
-pipeline：
+v0.5.0 在 Firmware Intelligence pipeline 上增加结构化、确定性的 Firmware Project
+Generation Layer：
 
 ```text
 AgentTask -> Requirement Analyzer -> Knowledge Retriever -> Firmware Planner
-          -> FirmwareGenerator -> FirmwareValidator -> AgentResult
+          -> FirmwareProjectGenerator -> FirmwareProjectValidator -> AgentResult
 ```
 
 - `embedded_copilot.agents.firmware.FirmwareAgent`：现有 LangGraph Runtime Agent，
   保持异步接口和原有调用方式。
 - `embedded_copilot.firmware.FirmwareAgent`：新的同步 Foundation Agent，提供 Platform
   abstraction、Firmware Knowledge retrieval、deterministic planning、mock Template system、
-  code generation interface 和 validation interface。
+  project generation interface 和 validation interface。其成功输出为内存中的
+  `FirmwareProject` JSON。
 
 Firmware Agent 不会自动读取本地文件。调用方可以显式构建离线知识检索器：
 
@@ -154,10 +155,29 @@ chunks = FirmwareChunker().chunk(documents)
 agent = FirmwareAgent(retriever=FirmwareKnowledgeRetriever(chunks))
 ```
 
-当前生成内容仅用于离线接口验证，不是可编译或经过硬件验证的固件。本阶段不支持 LLM
-直接代码生成、真实 ESP-IDF/STM32 工程生成、真实编译、自动烧录、硬件控制、PCB 或
-EDA 处理。Retriever 与 Planner 只能提供知识依据和模块建议，代码仍由确定性 mock
-`FirmwareGenerator` 生成。
+Project Generator 复用既有 `FirmwareGenerator` 的 mock C 输出，但工程级路径、header、
+README 和 build scaffold 只由独立的 project templates/adapters 提供。它不会修改旧
+Generator templates 或 bindings。ESP32 工程使用 `main/` 结构；STM32 UART 工程使用
+`Core/Src/` 与 `Core/Inc/` 结构。
+
+```python
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.firmware import FirmwareAgent, FirmwareProject
+
+result = FirmwareAgent().run(
+    AgentTask(
+        task_id="project-demo",
+        task_type="firmware",
+        requirement="ESP32 ESP-IDF GPIO WiFi",
+        metadata={"project_name": "sensor_node"},
+    )
+)
+project = FirmwareProject.model_validate_json(result.output)
+```
+
+当前 Project 只存在于返回模型中，不写入本地目录，也不是可编译或经过硬件验证的真实
+ESP-IDF/STM32 工程。本阶段不支持 LLM 直接代码生成、SDK 下载、真实编译、自动烧录、
+硬件控制、PCB 或 EDA 处理。所有工程内容都明确标记为 mock/unverified。
 
 ## Current Runtime Scope
 

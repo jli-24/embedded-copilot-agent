@@ -16,3 +16,7 @@ class FirmwarePlanningError(FirmwareIntelligenceError):
 
 class FirmwareGenerationError(FirmwareIntelligenceError):
     """Raised when a firmware request cannot produce mock generated code."""
+
+
+class FirmwareProjectError(FirmwareIntelligenceError):
+    """Raised when a validated plan cannot produce a mock firmware project."""

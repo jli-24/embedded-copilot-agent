@@ -10,12 +10,15 @@ from embedded_copilot.firmware.exceptions import (
     FirmwareIntelligenceError,
     FirmwareKnowledgeError,
     FirmwarePlanningError,
+    FirmwareProjectError,
 )
 from embedded_copilot.firmware.generator import FirmwareGenerator
 from embedded_copilot.firmware.intelligence.analyzer import FirmwareRequirementAnalyzer
 from embedded_copilot.firmware.knowledge.models import FirmwareDocument
 from embedded_copilot.firmware.knowledge.retriever import FirmwareKnowledgeRetriever
 from embedded_copilot.firmware.planner.planner import FirmwarePlanner
+from embedded_copilot.firmware.project.generator import FirmwareProjectGenerator
+from embedded_copilot.firmware.project.validator import FirmwareProjectValidator
 from embedded_copilot.firmware.validator import FirmwareValidator
 
 
@@ -23,7 +26,7 @@ class FirmwareAgent(BaseAgent):
     """Foundation-only deterministic firmware request orchestrator."""
 
     name = "FirmwareAgent"
-    description = "Validates firmware requests and produces unverified mock code."
+    description = "Produces validated, unverified mock firmware projects."
     capabilities = ("code_generation", "platform_check")
 
     def __init__(
@@ -34,14 +37,33 @@ class FirmwareAgent(BaseAgent):
         planner: FirmwarePlanner | None = None,
         generator: FirmwareGenerator | None = None,
         validator: FirmwareValidator | None = None,
+        project_generator: FirmwareProjectGenerator | None = None,
+        project_validator: FirmwareProjectValidator | None = None,
     ) -> None:
+        if project_generator is not None and (
+            generator is not None or validator is not None
+        ):
+            raise ValueError(
+                "project_generator cannot be combined with generator or validator"
+            )
         self._analyzer = analyzer if analyzer is not None else FirmwareRequirementAnalyzer()
         self._retriever = (
             retriever if retriever is not None else FirmwareKnowledgeRetriever()
         )
         self._planner = planner if planner is not None else FirmwarePlanner()
-        self._generator = generator if generator is not None else FirmwareGenerator()
-        self._validator = validator if validator is not None else FirmwareValidator()
+        self._project_generator = (
+            project_generator
+            if project_generator is not None
+            else FirmwareProjectGenerator(
+                code_generator=generator,
+                code_validator=validator,
+            )
+        )
+        self._project_validator = (
+            project_validator
+            if project_validator is not None
+            else FirmwareProjectValidator()
+        )
 
     def run(self, task: AgentTask) -> AgentResult:
         try:
@@ -62,31 +84,43 @@ class FirmwareAgent(BaseAgent):
                 )
             ]
             plan = self._planner.plan(analysis, documents)
-            request = plan.to_firmware_request(
-                requirement=analysis.requirement,
-                metadata=analysis.metadata,
-            )
-            generated = self._generator.generate(request)
-            validation = self._validator.validate(generated)
-            validation_payload = validation.model_dump(mode="json")
-            intelligence_metadata = {
+            project = self._project_generator.generate(plan)
+            validation = self._project_validator.validate(project)
+            base_metadata = {
                 "firmware_plan": plan.model_dump(mode="json"),
                 "retrieved_documents": [
                     document.model_dump(mode="json") for document in documents
                 ],
-                "validation": validation_payload,
             }
             if not validation.success:
                 return AgentResult(
                     agent_name=self.name,
                     status=AgentStatus.ERROR,
-                    output="; ".join(validation.errors),
-                    metadata=intelligence_metadata,
+                    output="firmware project validation failed",
+                    metadata={
+                        **base_metadata,
+                        "firmware_project": {
+                            "status": "rejected",
+                            "platform": plan.platform,
+                            "file_count": len(project.files),
+                        },
+                        "validation": {
+                            "success": False,
+                            "errors": ["firmware project validation failed"],
+                            "warnings": [],
+                            "metadata": {"error_count": len(validation.errors)},
+                        },
+                    },
                 )
+            intelligence_metadata = {
+                **base_metadata,
+                "firmware_project": project.model_dump(mode="json"),
+                "validation": validation.model_dump(mode="json"),
+            }
             return AgentResult(
                 agent_name=self.name,
                 status=AgentStatus.SUCCESS,
-                output=generated.model_dump_json(),
+                output=project.model_dump_json(),
                 metadata=intelligence_metadata,
             )
         except FirmwareIntelligenceError as exc:
@@ -123,6 +157,8 @@ class FirmwareAgent(BaseAgent):
             return "firmware knowledge retrieval failed"
         if isinstance(error, FirmwarePlanningError):
             return "firmware planning failed: platform is required"
+        if isinstance(error, FirmwareProjectError):
+            return "firmware project generation failed"
         if isinstance(error, FirmwareGenerationError):
             return "firmware code generation failed"
         return "firmware intelligence pipeline failed"

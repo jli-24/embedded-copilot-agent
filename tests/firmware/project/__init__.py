@@ -1,0 +1,1 @@
+"""Firmware project generation tests."""

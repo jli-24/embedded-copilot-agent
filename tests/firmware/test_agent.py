@@ -13,7 +13,7 @@ from embedded_copilot.firmware.capability import (
     FirmwareCapabilityDescriptor,
     register_firmware_foundation,
 )
-from embedded_copilot.firmware.models import GeneratedCode
+from embedded_copilot.firmware.project.models import FirmwareProject
 
 
 def test_firmware_agent_import_paths_do_not_shadow_runtime_agent() -> None:
@@ -23,7 +23,7 @@ def test_firmware_agent_import_paths_do_not_shadow_runtime_agent() -> None:
     assert not inspect.iscoroutinefunction(FoundationFirmwareAgent.run)
 
 
-def test_firmware_agent_extracts_request_and_returns_generated_json() -> None:
+def test_firmware_agent_extracts_request_and_returns_project_json() -> None:
     result = FoundationFirmwareAgent().run(
         AgentTask(
             task_id="1",
@@ -32,10 +32,16 @@ def test_firmware_agent_extracts_request_and_returns_generated_json() -> None:
         )
     )
 
-    generated = GeneratedCode.model_validate_json(result.output)
+    project = FirmwareProject.model_validate_json(result.output)
     assert result.status is AgentStatus.SUCCESS
-    assert generated.platform == "ESP32"
-    assert [file.filename for file in generated.files] == ["main.c", "wifi.c"]
+    assert project.platform == "ESP32"
+    assert [file.path for file in project.files] == [
+        "main/main.c",
+        "main/wifi.c",
+        "main/wifi.h",
+        "README.md",
+        "CMakeLists.txt",
+    ]
     assert result.metadata["validation"]["success"] is True
 
 
@@ -54,9 +60,9 @@ def test_firmware_agent_metadata_overrides_rule_extraction() -> None:
         )
     )
 
-    generated = GeneratedCode.model_validate_json(result.output)
-    assert generated.project_name == "serial_demo"
-    assert generated.platform == "STM32"
+    project = FirmwareProject.model_validate_json(result.output)
+    assert project.name == "serial_demo"
+    assert project.platform == "STM32"
 
 
 def test_firmware_agent_reports_missing_platform() -> None:
@@ -78,7 +84,7 @@ def test_firmware_agent_maps_generation_error() -> None:
     )
 
     assert result.status is AgentStatus.ERROR
-    assert result.metadata["error_type"] == "FirmwareGenerationError"
+    assert result.metadata["error_type"] == "FirmwareProjectError"
 
 
 def test_capability_descriptor_and_explicit_bootstrap() -> None:

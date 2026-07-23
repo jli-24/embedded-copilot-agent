@@ -9,6 +9,7 @@ from embedded_copilot.schemas.result import ContractModel
 
 
 class FirmwarePlan(ContractModel):
+    project_name: str | None = Field(default=None, min_length=1)
     platform: str = Field(min_length=1)
     framework: str | None = Field(default=None, min_length=1)
     components: list[str] = Field(default_factory=list)
@@ -17,7 +18,13 @@ class FirmwarePlan(ContractModel):
     dependencies: list[str] = Field(default_factory=list)
     rationale: str = Field(min_length=1)
 
-    @field_validator("platform", "framework", "rationale", mode="before")
+    @field_validator(
+        "project_name",
+        "platform",
+        "framework",
+        "rationale",
+        mode="before",
+    )
     @classmethod
     def strip_strings(cls, value: object) -> object:
         return value.strip() if isinstance(value, str) else value
@@ -35,6 +42,8 @@ class FirmwarePlan(ContractModel):
             "planned_dependencies": list(self.dependencies),
             "planning_rationale": self.rationale,
         }
+        if self.project_name is not None:
+            request_metadata["project_name"] = self.project_name
         return FirmwareRequest(
             requirement=requirement,
             platform=self.platform,

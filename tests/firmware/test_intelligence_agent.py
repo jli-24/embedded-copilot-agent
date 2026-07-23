@@ -5,6 +5,7 @@ from embedded_copilot.firmware.knowledge.models import FirmwareDocument
 from embedded_copilot.firmware.knowledge.retriever import FirmwareKnowledgeRetriever
 from embedded_copilot.firmware.models import GeneratedCode, GeneratedFile, ValidationResult
 from embedded_copilot.firmware.planner.models import FirmwarePlan
+from embedded_copilot.firmware.project.models import FirmwareProject
 
 
 def _document() -> FirmwareDocument:
@@ -31,12 +32,15 @@ def test_agent_runs_intelligence_pipeline_and_returns_metadata() -> None:
         )
     )
 
-    generated = GeneratedCode.model_validate_json(result.output)
+    project = FirmwareProject.model_validate_json(result.output)
     assert result.status is AgentStatus.SUCCESS
-    assert [item.filename for item in generated.files] == [
-        "main.c",
-        "wifi.c",
-        "camera.c",
+    assert [item.path for item in project.files] == [
+        "main/main.c",
+        "main/wifi.c",
+        "main/wifi.h",
+        "main/camera.c",
+        "README.md",
+        "CMakeLists.txt",
     ]
     assert result.metadata["firmware_plan"]["components"] == ["wifi", "camera"]
     assert result.metadata["retrieved_documents"][0]["id"] == "camera-doc"
@@ -120,7 +124,13 @@ class _TrackingGenerator:
         return GeneratedCode(
             project_name="test",
             platform="ESP32",
-            files=[GeneratedFile(filename="main.c", content="mock", language="C")],
+            files=[
+                GeneratedFile(
+                    filename="main.c",
+                    content="mock/unverified",
+                    language="C",
+                )
+            ],
         )
 
 

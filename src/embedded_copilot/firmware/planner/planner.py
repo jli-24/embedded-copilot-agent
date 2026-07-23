@@ -25,6 +25,16 @@ class FirmwarePlanner:
         if analysis.platform is None:
             raise FirmwarePlanningError("firmware platform is required for planning")
 
+        project_name_value = analysis.metadata.get("project_name")
+        if project_name_value is None:
+            project_name = None
+        elif isinstance(project_name_value, str) and project_name_value.strip():
+            project_name = project_name_value.strip()
+        else:
+            raise FirmwarePlanningError(
+                "firmware project_name must be a non-empty string"
+            )
+
         files = ["main.c"]
         for peripheral in analysis.peripherals:
             filename = _FILE_BY_PERIPHERAL.get(peripheral.casefold())
@@ -46,6 +56,7 @@ class FirmwarePlanner:
                 "no firmware knowledge documents matched, so the plan is unverified."
             )
         return FirmwarePlan(
+            project_name=project_name,
             platform=analysis.platform,
             framework=analysis.framework,
             components=list(analysis.features),
