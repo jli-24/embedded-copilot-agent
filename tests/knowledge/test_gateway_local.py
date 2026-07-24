@@ -110,12 +110,13 @@ def test_local_provider_maps_all_domains_with_safe_namespaced_metadata() -> None
     ] == original_documents
 
 
-def test_local_provider_enforces_query_top_k_after_stable_ranking() -> None:
+def test_legacy_local_provider_returns_all_candidates_in_stable_order() -> None:
     results = _provider().search(KnowledgeQuery(query="SPI", top_k=2))
 
     assert [result.id for result in results] == [
         "firmware:fw-spi",
         "hardware:hw-spi",
+        "pcb:pcb-spi",
     ]
 
 

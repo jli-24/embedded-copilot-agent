@@ -1,5 +1,30 @@
 # Embedded Copilot Agent v0.1 Architecture
 
+## v0.13 Knowledge Provider Flow
+
+```text
+SupervisorAgent.run()
+  -> KnowledgeGateway.search()
+  -> ProviderRegistry.search()
+       -> LocalKnowledgeProvider
+       -> explicitly injected offline fixture providers
+  -> ordered candidates
+  -> KnowledgeGateway ranking / deduplication / global top-k
+  -> KnowledgeContext
+  -> domain knowledge adapters
+  -> domain Agents
+```
+
+`KnowledgeProvider` 是 runtime-checkable `Protocol`，不要求实现类继承。ProviderRegistry
+拥有 Provider 注册、移除、调用、source filter、query mutation 检查、返回值重验证和稳定
+candidate 合并；它不拥有 ranking、deduplication、source priority 或 top-k。统一检索策略
+只属于 KnowledgeGateway，Supervisor 与领域 Agent 均不感知 Registry。
+
+Local Provider 的 filesystem 模式只接受调用方显式注入的 root，构造时对 canonical
+`firmware`、`hardware`、`pcb`、`debug` 目录建立一次性只读 snapshot；legacy retriever
+模式继续兼容原 import path 与 `add_documents()`。两种模式互斥，均不读取 Settings 或隐式
+仓库路径。v0.13 不包含真实 Web/GitHub Provider、HTTP、下载、LLM 或 LangGraph Runtime。
+
 ## v0.12 Foundation Supervisor Knowledge Flow
 
 ```text

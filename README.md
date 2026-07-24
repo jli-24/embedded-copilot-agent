@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.12.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.13.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -269,16 +269,29 @@ Rule Engine 是确定性、无副作用的 requirement-level evidence checker；
 
 ## Knowledge Gateway Architecture
 
-v0.8.0 新增同步、确定性、离线优先的统一知识访问层：
+v0.13.0 在 v0.8.0 统一知识访问层上增加显式 Provider lifecycle 与本地 snapshot：
 
 ```text
-KnowledgeQuery -> KnowledgeGateway -> Local / GitHub Mock / Web Mock Providers
-               -> validation -> merge -> stable ranking -> KnowledgeResult list
+KnowledgeQuery
+  -> KnowledgeGateway
+  -> ProviderRegistry
+  -> Local / GitHub Fixture / Web Fixture Providers
+  -> candidate merge
+  -> Gateway ranking + deduplication + global top-k
+  -> KnowledgeResult list
 ```
 
-Local Provider 只包装现有 Firmware、Hardware 和 PCB Retriever，不修改 Retriever，
-也不自动扫描文件系统。Web/GitHub Provider 默认返回空列表，只能由调用方显式注入
-exact-query 离线 fixture；它们不会访问网络、GitHub API 或读取 Token。
+`KnowledgeProvider` 保持 runtime-checkable structural `Protocol`，第三方实现不需要继承项目
+基类。`ProviderRegistry` 只负责 Provider 注册顺序、生命周期、source filter、query mutation
+检查、结果验证和 candidate 合并；返回顺序固定为 Provider 注册顺序及 Provider 内部顺序。
+Registry 不执行 ranking、deduplication、source priority 或 top-k。上述检索策略只属于
+`KnowledgeGateway`。
+
+Local Provider 支持两种互斥模式：无 root 时保留 v0.12 的 Firmware、Hardware、PCB
+Retriever adapter 和 `add_documents()`；显式传入 `knowledge_root` 时，构造阶段一次性读取
+`firmware/`、`hardware/`、`pcb/`、`debug/` 下的 `.md` 与 standalone `.json`，形成只读
+snapshot。它不自动使用仓库路径或 Settings。Provider score 只作为 candidate 字段，不触发
+Provider 内排序。Web/GitHub Provider 仍仅是显式离线 fixture，不访问网络、GitHub API 或 Token。
 
 ```python
 from embedded_copilot.knowledge.gateway import (
@@ -290,7 +303,7 @@ from embedded_copilot.knowledge.local import LocalKnowledgeProvider
 from embedded_copilot.knowledge.models import KnowledgeQuery, KnowledgeSource
 from embedded_copilot.knowledge.web import WebSearchProvider
 
-local = LocalKnowledgeProvider()
+local = LocalKnowledgeProvider(knowledge_root="authorized-knowledge")
 gateway = KnowledgeGateway(
     [local, GitHubSearchProvider(), WebSearchProvider()]
 )
@@ -304,10 +317,11 @@ results = gateway.search(
 adapter = KnowledgeGatewayAdapter(gateway, local, top_k=4)
 ```
 
-每个 Provider 必须把 `KnowledgeQuery` 当作不可变输入，并最多返回 `query.top_k`
-条结果；Gateway 合并后仍会执行全局 top-k。任一 Provider 失败、修改 query、返回超量
-或 malformed result 时，Gateway 整体安全失败，不返回不可诊断的部分结果。本阶段不把
-Gateway 注入现有 Agents，也不提供真实 Web/GitHub 搜索。
+每个 Provider 必须把 `KnowledgeQuery` 当作不可变输入，可以返回超过 `query.top_k` 的合法
+candidates，但不得自行重排或截断统一结果。Gateway 在合并后执行一次全局 ranking、dedup 和
+top-k。任一 Provider 失败、修改 query 或返回 malformed result 时，Gateway 整体安全失败，
+不返回不可诊断的部分结果。v0.13.0 不新增在线 Provider、HTTP、GitHub API、Datasheet 下载、
+LLM 或 LangGraph Runtime。
 
 ## Supervisor Foundation Architecture
 

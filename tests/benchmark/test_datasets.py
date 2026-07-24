@@ -1,6 +1,7 @@
 from embedded_copilot.benchmark.datasets.synthetic import (
     create_synthetic_foundation_dataset,
     create_synthetic_knowledge_injection_dataset,
+    create_synthetic_provider_integration_dataset,
 )
 
 
@@ -44,4 +45,15 @@ def test_synthetic_knowledge_injection_dataset_is_separate_and_safe() -> None:
         "fixture_kind": "synthetic",
         "required_agents": ["firmware", "hardware", "pcb", "debug"],
     }
+    assert len(create_synthetic_foundation_dataset().list_cases()) == 7
+
+
+def test_synthetic_provider_dataset_is_independent_from_golden_dataset() -> None:
+    dataset = create_synthetic_provider_integration_dataset()
+    cases = dataset.list_cases()
+
+    assert dataset.name == "synthetic-provider-integration"
+    assert len(cases) == 1
+    assert cases[0].category == "end_to_end"
+    assert cases[0].metadata["fixture_kind"] == "synthetic"
     assert len(create_synthetic_foundation_dataset().list_cases()) == 7

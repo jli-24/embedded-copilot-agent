@@ -3,6 +3,7 @@ import socket
 import pytest
 
 from embedded_copilot.knowledge.exceptions import KnowledgeProviderError
+from embedded_copilot.knowledge.gateway import KnowledgeGateway
 from embedded_copilot.knowledge.github import GitHubSearchProvider
 from embedded_copilot.knowledge.models import (
     KnowledgeQuery,
@@ -56,7 +57,7 @@ def test_web_provider_returns_only_exact_query_fixture_with_provider_metadata() 
     assert fixture.metadata == {"license": "test"}
 
 
-def test_github_provider_enforces_query_top_k_and_preserves_order() -> None:
+def test_github_provider_returns_all_candidates_in_fixture_order() -> None:
     provider = GitHubSearchProvider(
         {
             "UART": [
@@ -69,8 +70,25 @@ def test_github_provider_enforces_query_top_k_and_preserves_order() -> None:
 
     results = provider.search(KnowledgeQuery(query="UART", top_k=2))
 
-    assert [result.id for result in results] == ["one", "two"]
+    assert [result.id for result in results] == ["one", "two", "three"]
     assert all(result.metadata["provider"] == "github" for result in results)
+
+
+def test_gateway_can_select_high_score_after_fixture_query_top_k() -> None:
+    provider = GitHubSearchProvider(
+        {
+            "UART": [
+                _result("low", KnowledgeSource.GITHUB, score=0.1),
+                _result("high", KnowledgeSource.GITHUB, score=0.9),
+            ]
+        }
+    )
+
+    results = KnowledgeGateway([provider]).search(
+        KnowledgeQuery(query="UART", top_k=1)
+    )
+
+    assert [result.id for result in results] == ["high"]
 
 
 def test_mock_providers_treat_query_as_immutable() -> None:

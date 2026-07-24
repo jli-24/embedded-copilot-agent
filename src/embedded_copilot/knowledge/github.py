@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from embedded_copilot.knowledge.models import KnowledgeResult, KnowledgeSource
-from embedded_copilot.knowledge.providers import _OfflineFixtureProvider
+from embedded_copilot.knowledge.providers._fixtures import _OfflineFixtureProvider
 
 
 class GitHubSearchProvider(_OfflineFixtureProvider):

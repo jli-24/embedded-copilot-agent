@@ -134,6 +134,16 @@ class _TooManyProvider(_Provider):
         ]
 
 
+def test_gateway_accepts_all_candidates_then_enforces_global_top_k() -> None:
+    provider = _TooManyProvider("local", KnowledgeSource.LOCAL)
+
+    results = KnowledgeGateway([provider]).search(
+        KnowledgeQuery(query="SPI", top_k=1)
+    )
+
+    assert [result.id for result in results] == ["result-0"]
+
+
 class _MutatingProvider(_Provider):
     def search(self, query: KnowledgeQuery):
         filters = query.metadata["filters"]
@@ -150,7 +160,6 @@ class _FailingProvider(_Provider):
 @pytest.mark.parametrize(
     "provider",
     [
-        _TooManyProvider("local", KnowledgeSource.LOCAL),
         _Provider("local", KnowledgeSource.LOCAL, [object()]),
         _FailingProvider("local", KnowledgeSource.LOCAL),
     ],
