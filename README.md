@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.13.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.14.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -322,6 +322,42 @@ candidates，但不得自行重排或截断统一结果。Gateway 在合并后�
 top-k。任一 Provider 失败、修改 query 或返回 malformed result 时，Gateway 整体安全失败，
 不返回不可诊断的部分结果。v0.13.0 不新增在线 Provider、HTTP、GitHub API、Datasheet 下载、
 LLM 或 LangGraph Runtime。
+
+## GitHub Engineering Knowledge Provider
+
+v0.14.0 新增显式注入、同步且完全离线可测的 GitHub engineering knowledge Provider：
+
+```text
+KnowledgeQuery -> KnowledgeGateway -> ProviderRegistry
+               -> GitHubKnowledgeProvider -> GitHubClient
+               -> ordered candidates
+               -> Gateway ranking / deduplication / global top-k
+```
+
+`GitHubClient` 是 structural `Protocol`，repository、code、issue 和 release raw models
+只存在于 `embedded_copilot.knowledge.github` 内部模块，不向 Supervisor、Agent 或 knowledge
+package root 导出。`FakeGitHubClient` 只返回显式 synthetic fixtures 的 deep copies；本版本不提供
+HTTP client，不读取环境变量、Settings、Token 或全局配置。
+
+```python
+from embedded_copilot.knowledge.gateway import KnowledgeGateway
+from embedded_copilot.knowledge.github.client import FakeGitHubClient
+from embedded_copilot.knowledge.providers.github import GitHubKnowledgeProvider
+
+client = FakeGitHubClient(repositories={"ESP32": [synthetic_repository]})
+gateway = KnowledgeGateway([GitHubKnowledgeProvider(client)])
+```
+
+Provider 根据显式 `github_types`、Supervisor domains 或固定关键词规则选择 client 方法，按
+repository、code、issue、release 顺序合并 candidates。它不排序、不去重、不执行 top-k；
+统一检索策略仍只属于 Gateway。映射内容使用 whitespace normalization 后固定截断至 2000
+字符，不调用 LLM，不保存完整源码或完整 issue/release 正文。Reference URL 仅允许无 query、
+fragment 或 userinfo 的 GitHub repository、issue 和 release HTTPS 路径。
+
+未注入 client 时 Provider 返回空 candidates，Gateway 与 Supervisor 继续正常执行。Rate limit
+及其他 client failure 只返回固定安全错误，不公开 Token、header、URL query、路径或异常正文。
+现有 `GitHubSearchProvider` 离线 fixture import 保持兼容。v0.14.0 不执行真实 GitHub API、
+HTTP、网页抓取、clone、下载、缓存、数据库、LLM 或 LangGraph Runtime。
 
 ## Supervisor Foundation Architecture
 

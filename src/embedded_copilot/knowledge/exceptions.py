@@ -14,5 +14,9 @@ class ProviderUnavailable(ProviderError):
     """Raised when a configured provider cannot be used."""
 
 
+class GitHubRateLimitError(ProviderUnavailable):
+    """Raised when an injected GitHub client reports rate limiting."""
+
+
 class ProviderInvalidResult(ProviderError):
     """Raised when a provider violates its boundary contract."""

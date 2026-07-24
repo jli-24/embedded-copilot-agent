@@ -71,5 +71,19 @@ class _OfflineFixtureProvider:
             ) from exc
 
 
+class GitHubSearchProvider(_OfflineFixtureProvider):
+    """Offline-only GitHub provider backed by explicit query fixtures."""
+
+    def __init__(
+        self,
+        responses: Mapping[str, Sequence[KnowledgeResult]] | None = None,
+    ) -> None:
+        super().__init__(
+            responses,
+            provider_name="github",
+            source=KnowledgeSource.GITHUB,
+        )
+
+
 def _revalidate_result(result: KnowledgeResult) -> KnowledgeResult:
     return KnowledgeResult.model_validate(result.model_dump(mode="python"))

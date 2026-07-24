@@ -1,5 +1,29 @@
 # Embedded Copilot Agent v0.1 Architecture
 
+## v0.14 GitHub Provider Flow
+
+```text
+SupervisorAgent.run()
+  -> KnowledgeGateway.search()
+  -> ProviderRegistry.search()
+  -> GitHubKnowledgeProvider
+  -> explicitly injected GitHubClient
+  -> ordered KnowledgeResult candidates
+  -> KnowledgeGateway ranking / deduplication / global top-k
+  -> KnowledgeContext
+  -> domain knowledge adapters
+  -> domain Agents
+```
+
+GitHub 是 knowledge Provider，不是 Agent。Supervisor、Agent 和 Gateway 不导入 GitHub raw
+models；raw repository、code、issue、release contracts 只由 client 与 Provider 使用。
+Provider 不拥有 ranking、deduplication 或 top-k。内容通过确定性 whitespace normalization 与
+2000 字符截断生成，provenance metadata 和 reference URL 使用固定 allowlist。
+
+`FakeGitHubClient` 只接受显式 synthetic fixtures。未注入 client 时返回空 candidates，不使
+Gateway 或 Supervisor 失败。v0.14 不包含 HTTP、真实 GitHub API、网页抓取、clone、源码下载、
+Token 配置、缓存、数据库、LLM 或 LangGraph Runtime。
+
 ## v0.13 Knowledge Provider Flow
 
 ```text

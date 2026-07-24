@@ -162,3 +162,28 @@ def create_synthetic_provider_integration_dataset() -> BenchmarkDataset:
             )
         ],
     )
+
+
+def create_synthetic_github_provider_dataset() -> BenchmarkDataset:
+    return BenchmarkDataset(
+        "synthetic-github-provider",
+        [
+            BenchmarkCase(
+                id="synthetic-github-provider",
+                name="Synthetic GitHub provider integration",
+                category="end_to_end",
+                input=(
+                    "Design a synthetic ESP32 camera firmware, hardware, "
+                    "and PCB workflow."
+                ),
+                expected={
+                    "agents": ["FirmwareAgent", "HardwareAgent", "PCBAgent"],
+                    "capabilities": ["firmware", "hardware", "pcb"],
+                },
+                metadata={
+                    "fixture_kind": "synthetic",
+                    "required_agents": ["firmware", "hardware", "pcb"],
+                },
+            )
+        ],
+    )
