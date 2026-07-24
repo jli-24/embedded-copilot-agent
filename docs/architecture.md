@@ -1,5 +1,41 @@
 # Embedded Copilot Agent v0.1 Architecture
 
+## v0.15 Multimodal Input Foundation Flow
+
+```text
+User text + trusted-root relative attachment paths
+  |
+  v
+InputLoader  [metadata-only, content-blind]
+  |
+  v
+UserAttachment tuple -> UnifiedInputContext
+  |
+  v
+attach_input_context() -> private frozen envelope -> unchanged AgentTask
+  |
+  v
+SupervisorRequirementAnalyzer -> SupervisorTask.input_context
+  |
+  v
+existing text-based routing -> Planner -> domain Agents
+```
+
+Input Layer 与 Runtime Agent 职责分离。Loader 只能执行 root containment、symlink、regular-file、
+size、extension 和 MIME 验证；它不读取内容，不创建缓存、文件副本、sidecar、vector store 或
+索引。`UserAttachment` 只保存 basename、canonical MIME、size、type 和 `format/category`
+provenance。`UnifiedInputContext` 使用 tuple attachments 和 deep-copied、scalar-only、只读
+metadata，不保留 nested mutable state。
+
+Supervisor adapter 是唯一注入边界。Analyzer 只接受 adapter 创建的私有 envelope，普通 metadata
+payload 不能伪装成 context。Planner 和 Dispatcher 不传播 context，领域 Agent、KnowledgeGateway、
+Provider Contract、Benchmark public models 与原 `AgentTask` schema 保持不变。附件类型不参与
+v0.15 routing；路由仍由现有 deterministic text rules 决定。
+
+`embedded_copilot.multimodal` 的旧 PDF、image 和 text content processors 不在该数据流中，本版本
+不调用、不迁移、不修改。v0.16 PCB Parser 与 v0.17 Datasheet Intelligence 是未来独立设计范围，
+不属于 v0.15。
+
 ## v0.14 GitHub Provider Flow
 
 ```text

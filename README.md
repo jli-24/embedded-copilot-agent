@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.14.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.15.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -322,6 +322,66 @@ candidates，但不得自行重排或截断统一结果。Gateway 在合并后�
 top-k。任一 Provider 失败、修改 query 或返回 malformed result 时，Gateway 整体安全失败，
 不返回不可诊断的部分结果。v0.13.0 不新增在线 Provider、HTTP、GitHub API、Datasheet 下载、
 LLM 或 LangGraph Runtime。
+
+## Multimodal Input Foundation
+
+v0.15.0 新增独立的 metadata-only 工程输入层：
+
+```text
+trusted root / relative file
+  -> InputLoader metadata validation
+  -> UserAttachment
+  -> UnifiedInputContext
+  -> attach_input_context()
+  -> AgentTask
+  -> SupervisorRequirementAnalyzer
+  -> SupervisorTask.input_context
+  -> existing text-based routing
+```
+
+`InputLoader` 只通过文件系统 metadata 获取 basename、extension、size 和受控类型，不打开、
+读取、复制、缓存、解析或索引文件内容。Loader 拒绝绝对路径、path traversal、越界路径、
+symlink、非普通文件、空文件、超限文件、未知扩展名和不匹配的 MIME；返回模型和安全错误都
+不包含真实路径、用户目录、临时目录或文件内容。
+
+```python
+from pathlib import Path
+
+from embedded_copilot.agents.types import AgentTask
+from embedded_copilot.input import InputLoader, UnifiedInputContext
+from embedded_copilot.input.adapters import attach_input_context
+from embedded_copilot.supervisor import SupervisorAgent
+
+loader = InputLoader(Path("uploads"))
+attachment = loader.load(
+    "board.kicad_pcb",
+    attachment_id="board-1",
+    content_type="application/x-kicad-pcb",
+)
+context = UnifiedInputContext(
+    text="Review this ESP32 PCB layout",
+    attachments=(attachment,),
+)
+task = attach_input_context(
+    AgentTask(
+        task_id="board-review",
+        task_type="routing",
+        requirement=context.text,
+    ),
+    context,
+)
+result = SupervisorAgent().run(task)
+```
+
+`attach_input_context()` 是 context 进入 Supervisor 的唯一公开入口。`AgentTask` schema 保持
+不变，Analyzer 消费私有 envelope 后生成内部 `SupervisorTask.input_context`；Planner、
+Dispatcher、FirmwareAgent、HardwareAgent、PCBAgent、DebugAgent、KnowledgeGateway 和
+Provider 均不接收 `UserAttachment`。
+
+现有 `embedded_copilot.multimodal` 是早期内容处理实现，会读取文本并解析 PDF/图片，不属于
+v0.15 安全输入链路，本版本不调用、不迁移也不修改它。v0.15 不包含 Vision、OCR、PDF/Datasheet
+解析、EDA/PCB 解析、LLM 总结或文件内容理解。计划中的 v0.16 PCB Parser 与 v0.17 Datasheet
+Intelligence 必须分别完成范围、安全和测试设计后才能接入。
 
 ## GitHub Engineering Knowledge Provider
 

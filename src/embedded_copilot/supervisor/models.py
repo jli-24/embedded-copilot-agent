@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import copy
+
 from pydantic import Field, field_validator, model_validator
 
+from embedded_copilot.input.models import UnifiedInputContext
 from embedded_copilot.schemas.result import ContractModel
 
 
@@ -29,6 +32,7 @@ class SupervisorTask(ContractModel):
     required_agents: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     metadata: dict[str, object] = Field(default_factory=dict)
+    input_context: UnifiedInputContext | None = None
 
     @field_validator("request", "project_name", mode="before")
     @classmethod
@@ -39,6 +43,11 @@ class SupervisorTask(ContractModel):
     @classmethod
     def normalize_lists(cls, value: object) -> object:
         return _normalize_string_list(value)
+
+    @field_validator("input_context", mode="before")
+    @classmethod
+    def isolate_input_context(cls, value: object) -> object:
+        return copy.deepcopy(value)
 
 
 class AgentInvocation(ContractModel):

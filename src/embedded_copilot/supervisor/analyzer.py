@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import copy
 from collections.abc import Mapping
 
 from pydantic import ValidationError
 
+from embedded_copilot.input.adapters.supervisor import _consume_input_context
 from embedded_copilot.supervisor.exceptions import SupervisorAnalysisError
 from embedded_copilot.supervisor.models import SupervisorTask
 
@@ -115,7 +115,7 @@ class SupervisorRequirementAnalyzer:
         try:
             if metadata is not None and not isinstance(metadata, Mapping):
                 raise TypeError("metadata must be a mapping")
-            copied_metadata = copy.deepcopy(dict(metadata or {}))
+            copied_metadata, input_context = _consume_input_context(metadata)
             project_name = copied_metadata.pop("project_name", None)
             constraints = copied_metadata.pop("constraints", [])
             override_agents = copied_metadata.pop("required_agents", None)
@@ -134,6 +134,7 @@ class SupervisorRequirementAnalyzer:
                     for key, value in copied_metadata.items()
                     if key not in _CONTROL_FIELDS
                 },
+                input_context=input_context,
             )
         except SupervisorAnalysisError:
             raise

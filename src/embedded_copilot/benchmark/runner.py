@@ -55,6 +55,7 @@ _EXPECTED_METRICS = {
         "handoff_success",
     ),
 }
+_BENCHMARK_INPUT_CONTEXT_KEY = "_benchmark_input_context"
 
 
 class BenchmarkRunner:
@@ -206,12 +207,24 @@ class BenchmarkRunner:
             return search(query)
         from embedded_copilot.agents.types import AgentTask
 
+        metadata = copy.deepcopy(case.metadata)
+        raw_input_context = metadata.pop(_BENCHMARK_INPUT_CONTEXT_KEY, None)
         task = AgentTask(
             task_id=f"benchmark:{case.id}",
             task_type=case.category,
             requirement=case.input,
-            metadata=copy.deepcopy(case.metadata),
+            metadata=metadata,
         )
+        if raw_input_context is not None:
+            if case.category not in {"routing", "end_to_end"}:
+                raise TypeError("input context requires a supervisor target")
+            from embedded_copilot.input.adapters.supervisor import (
+                attach_input_context,
+            )
+            from embedded_copilot.input.models import UnifiedInputContext
+
+            context = UnifiedInputContext.model_validate(raw_input_context)
+            task = attach_input_context(task, context)
         run = getattr(target, "run", None)
         if not callable(run):
             raise TypeError("agent target must implement run")
