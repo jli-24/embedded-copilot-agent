@@ -279,6 +279,114 @@ def create_synthetic_multimodal_input_dataset() -> BenchmarkDataset:
     return BenchmarkDataset("synthetic-multimodal-input", cases)
 
 
+def create_synthetic_embedded_copilot_integration_dataset() -> BenchmarkDataset:
+    cases = [
+        BenchmarkCase(
+            id="synthetic-esp32-camera-integration",
+            name="Synthetic ESP32 camera integration",
+            category="end_to_end",
+            input=(
+                "Design an ESP32 camera system using datasheet power evidence, "
+                "firmware code, and KiCad PCB layout."
+            ),
+            expected={
+                "agents": ["FirmwareAgent", "HardwareAgent", "PCBAgent"],
+                "capabilities": ["firmware", "hardware", "pcb"],
+            },
+            metadata={
+                "fixture_kind": "synthetic",
+                "_benchmark_input_context": _synthetic_integration_context(
+                    (
+                        (
+                            "datasheet-1",
+                            "esp32-camera-datasheet.pdf",
+                            AttachmentType.DOCUMENT,
+                            "application/pdf",
+                            "pdf",
+                        ),
+                        (
+                            "pcb-1",
+                            "camera.kicad_pcb",
+                            AttachmentType.EDA,
+                            "application/x-kicad-pcb",
+                            "kicad_pcb",
+                        ),
+                    )
+                ),
+            },
+        ),
+        BenchmarkCase(
+            id="synthetic-firmware-debug-integration",
+            name="Synthetic firmware debug integration",
+            category="end_to_end",
+            input=(
+                "Generate ESP32 GPIO firmware code and inspect compile error "
+                "undefined reference to app_main from the supplied log."
+            ),
+            expected={
+                "agents": ["FirmwareAgent", "DebugAgent"],
+                "capabilities": ["firmware", "debug"],
+            },
+            metadata={
+                "fixture_kind": "synthetic",
+                "_benchmark_input_context": _synthetic_integration_context(
+                    (
+                        (
+                            "source-1",
+                            "peripheral_driver.c",
+                            AttachmentType.SOURCE_CODE,
+                            "text/x-c",
+                            "c",
+                        ),
+                        (
+                            "log-1",
+                            "compile.log",
+                            AttachmentType.LOG,
+                            "text/plain",
+                            "text",
+                        ),
+                    )
+                ),
+            },
+        ),
+        BenchmarkCase(
+            id="synthetic-pcb-review-integration",
+            name="Synthetic PCB review integration",
+            category="end_to_end",
+            input=(
+                "Review an ESP32 MCU KiCad PCB layout using datasheet "
+                "interface constraints."
+            ),
+            expected={
+                "agents": ["HardwareAgent", "PCBAgent"],
+                "capabilities": ["hardware", "pcb"],
+            },
+            metadata={
+                "fixture_kind": "synthetic",
+                "_benchmark_input_context": _synthetic_integration_context(
+                    (
+                        (
+                            "pcb-1",
+                            "routing.kicad_pcb",
+                            AttachmentType.EDA,
+                            "application/x-kicad-pcb",
+                            "kicad_pcb",
+                        ),
+                        (
+                            "datasheet-1",
+                            "interface-datasheet.pdf",
+                            AttachmentType.DOCUMENT,
+                            "application/pdf",
+                            "pdf",
+                        ),
+                    )
+                ),
+            },
+        ),
+    ]
+    return BenchmarkDataset("synthetic-embedded-copilot-integration", cases)
+
+
 def _synthetic_context(
     *,
     attachment_id: str,
@@ -301,6 +409,37 @@ def _synthetic_context(
                     "format": format_name,
                 },
             ),
+        ),
+        metadata={"source": "synthetic_fixture"},
+    ).model_dump(mode="json")
+
+
+def _synthetic_integration_context(
+    attachments: tuple[
+        tuple[str, str, AttachmentType, str, str],
+        ...,
+    ],
+) -> dict[str, object]:
+    return UnifiedInputContext(
+        attachments=tuple(
+            UserAttachment(
+                id=attachment_id,
+                filename=filename,
+                media_type=media_type,
+                content_type=content_type,
+                size_bytes=256,
+                metadata={
+                    "category": media_type.value,
+                    "format": format_name,
+                },
+            )
+            for (
+                attachment_id,
+                filename,
+                media_type,
+                content_type,
+                format_name,
+            ) in attachments
         ),
         metadata={"source": "synthetic_fixture"},
     ).model_dump(mode="json")

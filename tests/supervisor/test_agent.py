@@ -114,6 +114,7 @@ def test_supervisor_pipeline_returns_complete_typed_success_report() -> None:
         "supervisor_plan",
         "agent_results",
         "execution_summary",
+        "engineering_report",
     }
     assert result.metadata["execution_summary"] == report.model_dump(mode="json")
 

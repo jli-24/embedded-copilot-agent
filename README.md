@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.17.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.18.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -71,6 +71,40 @@ python -m compileall src
 - `trace_id`
 - Agent-specific `result`
 - 可空 `error`
+
+## Embedded Copilot Integration
+
+v0.18.0 在同步 Foundation Supervisor 内部增加 deterministic Integration Layer：
+
+```text
+AgentTask + UnifiedInputContext
+  -> SupervisorRequirementAnalyzer
+  -> IntegrationPlanner [Agent selection only]
+  -> KnowledgeGateway [Supervisor-owned, optional]
+  -> SupervisorPlanner
+  -> AgentExecutor -> existing AgentDispatcher
+  -> validated domain Agent results
+  -> immutable content-safe evidence snapshots
+  -> ResultAggregator [evidence aggregation only]
+  -> EngineeringReport
+```
+
+`IntegrationPlanner` 只根据 request、输入文本与附件安全元信息选择 Agent，不产生工程结论。
+执行顺序固定为 `FirmwareAgent -> HardwareAgent -> PCBAgent -> DebugAgent`，保留已有
+`FirmwareProject -> HardwareAgent` 与 `HardwarePlan -> PCBAgent` handoff。`AgentExecutor`
+只委托既有 Dispatcher 并验证返回类型，原 Agent output 原样保留给 legacy Supervisor 路径；Integration
+另行创建不含正文和 mutable metadata 的 evidence snapshot，单 Agent 失败不会阻止后续 Agent。
+
+`EngineeringReport` 通过 Supervisor `AgentResult.metadata["engineering_report"]` 暴露，原
+`AgentResult.output` 仍是 `SupervisorResult` JSON。报告 section、finding、recommendation 和
+trace 都包含 `source_agent` 与 `source_id`。Aggregator 只聚合 snapshot 中已有 Agent evidence 和已有 PCB/
+Debug recommendation；Firmware section 只列平台、框架、structure 与相对文件路径，不包含源码。
+报告也不会包含 `UnifiedPCBModel`、`UnifiedDatasheetModel`、PDF 正文、PCB 原始数据、日志全文、
+绝对路径、Token 或 Knowledge document content。
+
+Integration 不读取附件、不调用 Parser、不持有 Gateway、不增加 Provider、LLM、网络、缓存、索引
+或临时文件。预解析 PCB/Datasheet model 在 `EngineeringContext` 中是可选的 validated input；
+v0.18 不新增生产注入入口。v0.17 的 Parser 与 Adapter 实现保持不变。
 
 ## Datasheet Intelligence
 

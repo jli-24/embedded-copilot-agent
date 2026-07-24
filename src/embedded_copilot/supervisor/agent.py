@@ -9,6 +9,14 @@ from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
 from embedded_copilot.debug.agent import DebugAgent
 from embedded_copilot.firmware.agent import FirmwareAgent
 from embedded_copilot.hardware.agent import HardwareAgent
+from embedded_copilot.integration.aggregator import ResultAggregator
+from embedded_copilot.integration.context import (
+    AgentExecutionResult,
+    EngineeringContext,
+    IntegrationTraceEvent,
+)
+from embedded_copilot.integration.executor import AgentExecutor
+from embedded_copilot.integration.planner import IntegrationPlanner
 from embedded_copilot.knowledge.gateway import KnowledgeGateway
 from embedded_copilot.knowledge.models import KnowledgeQuery, KnowledgeResult
 from embedded_copilot.pcb.agent import PCBAgent
@@ -78,6 +86,9 @@ class SupervisorAgent(BaseAgent):
         self._aggregator = (
             aggregator if aggregator is not None else SupervisorResultAggregator()
         )
+        self._integration_planner = IntegrationPlanner()
+        self._integration_executor = AgentExecutor(self._dispatcher)
+        self._integration_aggregator = ResultAggregator()
         self._knowledge_gateway = knowledge_gateway
         self._knowledge_query_builder = (
             knowledge_query_builder
@@ -88,6 +99,8 @@ class SupervisorAgent(BaseAgent):
     def run(self, task: AgentTask) -> AgentResult:
         plan: SupervisorPlan | None = None
         results: list[AgentResult] = []
+        integration_results: tuple[AgentExecutionResult, ...] = ()
+        integration_trace: list[IntegrationTraceEvent] = []
         execution_context: ExecutionContext | None = None
         if not isinstance(task, AgentTask):
             return self._safe_failure(SupervisorAnalysisError, plan, results)
@@ -100,6 +113,30 @@ class SupervisorAgent(BaseAgent):
                 raise TypeError("analyzer returned an invalid task")
             analyzed = SupervisorTask.model_validate(
                 analyzed.model_dump(mode="json")
+            )
+            context = EngineeringContext(
+                request=analyzed.request,
+                input_context=analyzed.input_context,
+            )
+            explicit_agents = "required_agents" in task.metadata
+            selected_agents = self._integration_planner.select_agents(
+                context,
+                required_agents=(
+                    analyzed.required_agents if explicit_agents else None
+                ),
+                seed_agents=(None if explicit_agents else analyzed.required_agents),
+            )
+            analyzed_payload = analyzed.model_dump(mode="python")
+            analyzed_payload["required_agents"] = list(selected_agents)
+            analyzed = SupervisorTask.model_validate(analyzed_payload)
+            integration_trace.append(
+                IntegrationTraceEvent(
+                    sequence=1,
+                    stage="input_analyzed",
+                    status="success",
+                    source_agent="SupervisorAgent",
+                    source_id="supervisor:input-analysis",
+                )
             )
         except Exception:
             return self._safe_failure(SupervisorAnalysisError, plan, results)
@@ -129,32 +166,37 @@ class SupervisorAgent(BaseAgent):
             if not isinstance(planned, SupervisorPlan):
                 raise TypeError("planner returned an invalid plan")
             plan = SupervisorPlan.model_validate(planned.model_dump(mode="json"))
+            if execution_context is not None:
+                integration_trace.append(
+                    IntegrationTraceEvent(
+                        sequence=len(integration_trace) + 1,
+                        stage="knowledge_consumed",
+                        status="success",
+                        source_agent="SupervisorAgent",
+                        source_id="supervisor:knowledge-context",
+                    )
+                )
+            for invocation in plan.tasks:
+                integration_trace.append(
+                    IntegrationTraceEvent(
+                        sequence=len(integration_trace) + 1,
+                        stage="agent_planned",
+                        status="success",
+                        source_agent="SupervisorAgent",
+                        source_id=f"supervisor:plan:{invocation.agent_name}",
+                    )
+                )
         except Exception:
             return self._safe_failure(SupervisorPlanningError, plan, results)
 
         try:
-            if execution_context is None:
-                dispatched = self._dispatcher.dispatch(
+            dispatched, integration_results = (
+                self._integration_executor.execute_with_results(
                     task.model_copy(deep=True),
                     plan.model_copy(deep=True),
+                    execution_context=execution_context,
                 )
-            else:
-                dispatch_with_context = getattr(
-                    self._dispatcher,
-                    "_dispatch_with_context",
-                    None,
-                )
-                if not callable(dispatch_with_context):
-                    raise TypeError("dispatcher does not support execution context")
-                dispatched = dispatch_with_context(
-                    task.model_copy(deep=True),
-                    plan.model_copy(deep=True),
-                    execution_context,
-                )
-            if not isinstance(dispatched, list) or any(
-                not isinstance(result, AgentResult) for result in dispatched
-            ):
-                raise TypeError("dispatcher returned invalid results")
+            )
             results = list(dispatched)
         except Exception:
             return self._safe_failure(SupervisorDispatchError, plan, results)
@@ -171,6 +213,21 @@ class SupervisorAgent(BaseAgent):
             )
             if execution_context is not None:
                 report = self._with_trace(report, execution_context, results)
+            engineering_context = EngineeringContext(
+                request=task.requirement,
+                input_context=analyzed.input_context,
+                knowledge_context=(
+                    execution_context.knowledge_context
+                    if execution_context is not None
+                    else None
+                ),
+                agent_results=integration_results,
+                trace=tuple(integration_trace),
+            )
+            engineering_report = self._integration_aggregator.aggregate(
+                engineering_context.agent_results,
+                trace=engineering_context.trace,
+            )
         except Exception:
             return self._safe_failure(SupervisorAggregationError, plan, results)
 
@@ -184,6 +241,7 @@ class SupervisorAgent(BaseAgent):
                     result.model_dump(mode="json") for result in results
                 ],
                 "execution_summary": report.model_dump(mode="json"),
+                "engineering_report": engineering_report.model_dump(mode="json"),
             },
         )
 

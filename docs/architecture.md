@@ -1,4 +1,44 @@
-# Embedded Copilot Agent v0.17 Architecture
+# Embedded Copilot Agent v0.18 Architecture
+
+## v0.18 Embedded Copilot Integration Flow
+
+```text
+User request + UnifiedInputContext [metadata-only]
+  -> SupervisorAgent [only orchestration owner]
+  -> SupervisorRequirementAnalyzer
+  -> IntegrationPlanner [Agent selection only]
+  -> KnowledgeQueryBuilder -> KnowledgeGateway [optional, Supervisor-owned]
+  -> SupervisorPlanner
+  -> AgentExecutor -> existing AgentDispatcher
+       -> FirmwareAgent -> HardwareAgent -> PCBAgent -> DebugAgent
+  -> validate FirmwareProject / HardwarePlan / PCBReviewReport / DebugReport
+  -> immutable content-safe evidence snapshots
+  -> ResultAggregator [aggregation-only]
+  -> EngineeringReport [JSON / Markdown]
+```
+
+Integration Layer 位于 `embedded_copilot.integration`，只负责编排和结构化投影，不实现 Firmware、
+Hardware、PCB 或 Debug 领域知识。`IntegrationPlanner` 的唯一输出是 canonical Agent tuple；它使用
+request、`UnifiedInputContext.text`、attachment basename/type/format 和可选 validated structure
+model presence 做离线 deterministic selection，不读取附件内容，也不产生工程结论。
+
+`AgentExecutor` 只调用 Supervisor 已拥有的 `AgentDispatcher`。固定依赖顺序为
+`FirmwareAgent -> HardwareAgent -> PCBAgent -> DebugAgent`，继续保留 FirmwareProject 和
+HardwarePlan typed handoff。Executor 不修改 Agent output；原 output 继续进入 legacy Supervisor result，
+Integration 旁路验证成功 output 是否符合既有领域模型并投影为不含正文、metadata 或 mutable collection
+的 evidence snapshot。失败保持为该 Agent 的结构化 error 并继续后续执行。领域 Agent 不持有或调用 Gateway。
+
+`ResultAggregator` 只把 immutable evidence snapshot 聚合为 report sections。所有 section、finding、
+recommendation 与 trace event 都携带 `source_agent` 和 `source_id`。顶层 recommendation 仅复制
+PCB issue 和 Debug report 已存在的 recommendation，Aggregator 不生成新 recommendation。Firmware
+只报告 relative file path，不报告 file content；PCB/Datasheet structure model、Knowledge content、
+PDF 正文、PCB 原始内容、日志全文、绝对路径和 secret 均不会进入 EngineeringReport。
+
+原 `SupervisorAgent.run(AgentTask) -> AgentResult`、`AgentResult.output` 中的 `SupervisorResult`、
+Agent public API、Knowledge Gateway/Provider Contract、Benchmark public models/metrics 和四个领域
+输出 schema 均保持不变。`engineering_report` 是成功完成 dispatch 后新增的 metadata 字段。
+Integration 不调用 LLM，不创建 Parser、Provider、cache、index、temp file 或网络依赖；v0.17
+Datasheet Parser/Adapter、v0.16 PCB Parser/Adapter 和旧 `multimodal/` 均不修改。
 
 ## v0.17 Datasheet Intelligence Foundation Flow
 
@@ -85,12 +125,12 @@ metadata，不保留 nested mutable state。
 
 Supervisor adapter 是唯一注入边界。Analyzer 只接受 adapter 创建的私有 envelope，普通 metadata
 payload 不能伪装成 context。Planner 和 Dispatcher 不传播 context，领域 Agent、KnowledgeGateway、
-Provider Contract、Benchmark public models 与原 `AgentTask` schema 保持不变。附件类型不参与
-v0.15 routing；路由仍由现有 deterministic text rules 决定。
+Provider Contract、Benchmark public models 与原 `AgentTask` schema 保持不变。v0.15 当时的路由仍由
+text rules 决定；v0.18 的 Supervisor-owned IntegrationPlanner 才开始消费附件的安全元信息，仍不读取内容。
 
 `embedded_copilot.multimodal` 的旧 PDF、image 和 text content processors 不在该数据流中，
-不调用、不迁移、不修改。PCB 内容解析属于上面的独立 v0.16 Parser 边界；v0.17 Datasheet
-Intelligence 仍是未来独立设计范围。
+不调用、不迁移、不修改。PCB 与 Datasheet 内容解析分别属于上面的独立 v0.16/v0.17 Parser 边界，
+不进入 v0.18 Integration Layer。
 
 ## v0.14 GitHub Provider Flow
 

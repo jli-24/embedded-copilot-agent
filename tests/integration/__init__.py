@@ -1,0 +1,1 @@
+"""Embedded Copilot integration tests."""
