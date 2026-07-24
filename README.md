@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.16.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.17.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -71,6 +71,19 @@ python -m compileall src
 - `trace_id`
 - Agent-specific `result`
 - 可空 `error`
+
+## Datasheet Intelligence
+
+v0.17.0 新增独立、只读的 Datasheet 结构解析链。`InputLoader` 仍只读取附件元信息；
+调用方使用显式 attachment-id 到可信根目录相对路径的映射，将 `.md` 或文本型 `.pdf`
+交给 Datasheet Parser。Parser 只输出 immutable `UnifiedDatasheetModel`，不调用 LLM、OCR、
+网络、旧 `multimodal/` processor 或 RAG loader，也不创建缓存、索引或临时内容文件。
+
+Datasheet Adapter 将结构化 component、pin、interface 和 electrical evidence 转换为现有
+`HardwareDocument`、`PCBRuleDocument` 和 `FirmwareDocument`。调用方通过现有 retriever
+constructor 注入领域 Agent；Adapter 不执行自动选型，Agent API、Supervisor、Knowledge
+Gateway、Provider Contract 与领域输出 schema 保持不变。复杂 PDF 表格若无法从文本行可靠
+识别，会被忽略或安全拒绝，不进行几何重建或猜测。
 
 ## Knowledge Base
 

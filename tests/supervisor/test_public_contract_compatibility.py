@@ -6,6 +6,7 @@ import json
 
 import pytest
 
+from embedded_copilot.agents.types import AgentTask
 from embedded_copilot.benchmark.models import (
     BenchmarkBaseline,
     BenchmarkCase,
@@ -26,6 +27,10 @@ from embedded_copilot.schemas.result import ContractModel
 
 
 PUBLIC_SCHEMA_HASHES: tuple[tuple[type[ContractModel], str], ...] = (
+    (
+        AgentTask,
+        "79538070fc529dd2c2afbef09ef3e6059cf9a4380621279282ff25db9184410f",
+    ),
     (
         FirmwareProject,
         "c00beb11127f9034f55702239a43f518e9968d0d74cc366f483815054d00c9bf",
@@ -112,5 +117,5 @@ def test_health_schema_preserves_fields_and_required_state() -> None:
     assert set(schema["properties"]) == {"status", "version", "mode"}
     assert schema["properties"]["status"]["enum"] == ["ok", "degraded"]
     assert schema["properties"]["mode"]["enum"] == ["offline", "llm"]
-    assert schema["properties"]["version"]["const"] == "0.16.0"
-    assert schema["properties"]["version"]["default"] == "0.16.0"
+    assert schema["properties"]["version"]["const"] == "0.17.0"
+    assert schema["properties"]["version"]["default"] == "0.17.0"

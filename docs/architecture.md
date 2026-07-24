@@ -1,4 +1,29 @@
-# Embedded Copilot Agent v0.16 Architecture
+# Embedded Copilot Agent v0.17 Architecture
+
+## v0.17 Datasheet Intelligence Foundation Flow
+
+```text
+trusted root + explicit attachment-id mapping
+  -> InputLoader [metadata-only]
+  -> MarkdownDatasheetParser / PDFDatasheetParser [single-target, bounded]
+  -> UnifiedDatasheetModel [only Datasheet structure exchange model]
+  -> Datasheet Adapter [canonical domain evidence]
+  -> existing in-memory domain retriever
+  -> unchanged HardwareAgent / PCBAgent / FirmwareAgent
+```
+
+Datasheet Parser 与领域 Agent 分层。Parser 只读取 `UserAttachment` 显式映射的单个目标，
+复核 root containment、basename、document type、MIME、size、regular-file 与 symlink，
+不扫描目录。Markdown 只解析固定标签和标准 section table；PDF 只解析有文本层且抽取后仍为
+明确标签的行，并同时限制文件大小、页数和文本长度。复杂表格不做几何重建，无法可靠识别时
+忽略或安全失败。Parser 不依赖 `multimodal/`、旧 RAG loader、Agent、Supervisor、Knowledge
+Gateway、LLM 或网络，也不保存正文、AST、缓存、索引或中间文件。
+
+`UnifiedDatasheetModel` 使用 frozen nested models、tuple collections 与 deep-copied、
+scalar-only immutable metadata。同一文档产生相同的 component、pin、interface、electrical
+evidence 与序列化结果。Adapter 只生成 bounded canonical JSON evidence 和稳定 provenance，
+不产生设计建议或自动选型 metadata。现有领域 Agent 仅通过已有 retriever constructor 接收
+document；没有 Datasheet 时继续执行 v0.16 legacy path。
 
 ## v0.16 PCB Intelligence Foundation Flow
 
