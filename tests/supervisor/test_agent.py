@@ -166,6 +166,7 @@ def test_zero_argument_supervisor_registers_private_foundation_agents() -> None:
         "FirmwareAgent",
         "HardwareAgent",
         "PCBAgent",
+        "DebugAgent",
     ]
 
 
@@ -191,16 +192,21 @@ def test_zero_argument_supervisor_runs_real_offline_typed_pipeline() -> None:
     assert report.failed == []
 
 
-def test_supervisor_never_searches_injected_knowledge_gateway() -> None:
+def test_supervisor_searches_injected_knowledge_gateway_once() -> None:
     firmware, _, _ = _agents()
 
-    class FailingGateway:
-        def search(self, query: object) -> object:
-            raise AssertionError("KnowledgeGateway.search must not be called")
+    class RecordingGateway:
+        def __init__(self) -> None:
+            self.queries: list[object] = []
 
+        def search(self, query: object) -> list[object]:
+            self.queries.append(query)
+            return []
+
+    gateway = RecordingGateway()
     supervisor = SupervisorAgent(
         agents=[firmware],
-        knowledge_gateway=FailingGateway(),  # type: ignore[arg-type]
+        knowledge_gateway=gateway,  # type: ignore[arg-type]
     )
     task = AgentTask(
         task_id="one",
@@ -208,7 +214,12 @@ def test_supervisor_never_searches_injected_knowledge_gateway() -> None:
         requirement="firmware code",
     )
 
-    assert supervisor.run(task).status is AgentStatus.SUCCESS
+    result = supervisor.run(task)
+
+    assert result.status is AgentStatus.SUCCESS
+    assert len(gateway.queries) == 1
+    assert firmware.tasks[0].metadata["knowledge_mode"] == "supervisor_gateway"
+    assert firmware.tasks[0].metadata["knowledge_documents"] == []
 
 
 class RaisingAnalyzer:

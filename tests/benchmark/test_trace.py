@@ -118,3 +118,49 @@ def test_trace_collector_marks_execution_failure_without_exception_content() -> 
 
     assert trace.events[0].status == "error"
     assert trace.events[0].metadata == {}
+
+
+def test_trace_collector_observes_one_supervisor_gateway_call() -> None:
+    collector = TraceCollector(clock=_Clock(4.0, 4.001))
+    started_at = collector.start()
+    result = AgentResult(
+        agent_name="SupervisorAgent",
+        status=AgentStatus.SUCCESS,
+        output="safe supervisor result",
+        metadata={
+            "supervisor_plan": {
+                "tasks": [{"agent_name": "FirmwareAgent"}],
+            },
+            "agent_results": [
+                {"agent_name": "FirmwareAgent", "status": "success"},
+            ],
+            "execution_summary": {
+                "metadata": {
+                    "supervisor_trace": [
+                        {
+                            "stage": "gateway_retrieved",
+                            "status": "success",
+                            "target": "KnowledgeGateway",
+                            "domains": ["firmware"],
+                            "count": 1,
+                        }
+                    ]
+                }
+            },
+        },
+    )
+
+    trace = collector.collect(
+        case_id="gateway-chain",
+        target_name="SupervisorAgent",
+        result=result,
+        started_at=started_at,
+        execution_succeeded=True,
+    )
+
+    assert trace.execution_metrics.knowledge_calls == 1
+    assert [(event.event_type, event.target) for event in trace.events] == [
+        ("knowledge_call", "KnowledgeGateway"),
+        ("agent_call", "FirmwareAgent"),
+    ]
+    assert [event.sequence for event in trace.events] == [1, 2]

@@ -7,10 +7,19 @@ from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
 from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
+from embedded_copilot.debug.models import DebugReport
 from embedded_copilot.firmware.project.models import FirmwareProject
 from embedded_copilot.hardware.models import HardwarePlan
 from embedded_copilot.pcb.models import PCBReviewReport
+from embedded_copilot.supervisor.context import ExecutionContext
 from embedded_copilot.supervisor.exceptions import SupervisorDispatchError
+from embedded_copilot.supervisor.knowledge_adapters import (
+    adapt_debug_evidence,
+    adapt_firmware_documents,
+    adapt_hardware_documents,
+    adapt_pcb_documents,
+    knowledge_provenance,
+)
 from embedded_copilot.supervisor.models import SupervisorPlan
 
 
@@ -51,6 +60,28 @@ class AgentDispatcher:
         parent_task: AgentTask,
         plan: SupervisorPlan,
     ) -> list[AgentResult]:
+        return self._dispatch(parent_task, plan, execution_context=None)
+
+    def _dispatch_with_context(
+        self,
+        parent_task: AgentTask,
+        plan: SupervisorPlan,
+        execution_context: ExecutionContext,
+    ) -> list[AgentResult]:
+        if not isinstance(execution_context, ExecutionContext):
+            raise SupervisorDispatchError("execution context is invalid")
+        isolated = ExecutionContext.model_validate(
+            copy.deepcopy(execution_context.model_dump(mode="python"))
+        )
+        return self._dispatch(parent_task, plan, execution_context=isolated)
+
+    def _dispatch(
+        self,
+        parent_task: AgentTask,
+        plan: SupervisorPlan,
+        *,
+        execution_context: ExecutionContext | None,
+    ) -> list[AgentResult]:
         handoffs: dict[str, dict[str, object]] = {}
         results: list[AgentResult] = []
         for invocation in plan.tasks:
@@ -62,6 +93,13 @@ class AgentDispatcher:
             metadata.pop("firmware_project", None)
             metadata.pop("hardware_plan", None)
             metadata.update(copy.deepcopy(handoffs.get(invocation.agent_name, {})))
+            if execution_context is not None:
+                metadata.update(
+                    self._knowledge_metadata(
+                        invocation.agent_name,
+                        execution_context,
+                    )
+                )
             task = AgentTask(
                 task_id=f"{parent_task.task_id}:{invocation.agent_name}",
                 task_type=invocation.agent_name,
@@ -80,6 +118,48 @@ class AgentDispatcher:
                         handoffs[target] = handoff
             results.append(result)
         return results
+
+    @staticmethod
+    def _knowledge_metadata(
+        agent_name: str,
+        execution_context: ExecutionContext,
+    ) -> dict[str, object]:
+        results = execution_context.knowledge_context.retrieved_documents
+        domains = {
+            "FirmwareAgent": "firmware",
+            "HardwareAgent": "hardware",
+            "PCBAgent": "pcb",
+            "DebugAgent": "debug",
+        }
+        domain = domains.get(agent_name)
+        if domain is None:
+            raise SupervisorDispatchError("unsupported contextual agent")
+        metadata: dict[str, object] = {
+            "knowledge_mode": "supervisor_gateway",
+            "knowledge_provenance": knowledge_provenance(
+                results,
+                domain=domain,
+            ),
+        }
+        if agent_name == "FirmwareAgent":
+            metadata["knowledge_documents"] = [
+                item.model_dump(mode="json")
+                for item in adapt_firmware_documents(results)
+            ]
+        elif agent_name == "HardwareAgent":
+            metadata["knowledge_documents"] = [
+                item.model_dump(mode="json")
+                for item in adapt_hardware_documents(results)
+            ]
+        elif agent_name == "PCBAgent":
+            metadata["knowledge_documents"] = [
+                item.model_dump(mode="json") for item in adapt_pcb_documents(results)
+            ]
+        else:
+            metadata["knowledge_evidence"] = [
+                item.model_dump(mode="json") for item in adapt_debug_evidence(results)
+            ]
+        return metadata
 
     @classmethod
     def _run_agent(
@@ -118,6 +198,9 @@ class AgentDispatcher:
                 }
             if result.agent_name == "PCBAgent":
                 PCBReviewReport.model_validate_json(result.output)
+                return result, None
+            if result.agent_name == "DebugAgent":
+                DebugReport.model_validate_json(result.output)
                 return result, None
             raise ValueError("unsupported handoff agent")
         except (ValidationError, ValueError):

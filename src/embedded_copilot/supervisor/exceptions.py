@@ -13,6 +13,10 @@ class SupervisorPlanningError(SupervisorIntelligenceError):
     """Raised when a deterministic execution plan cannot be created."""
 
 
+class SupervisorKnowledgeError(SupervisorIntelligenceError):
+    """Raised when centralized knowledge integration fails safely."""
+
+
 class SupervisorDispatchError(SupervisorIntelligenceError):
     """Raised when a planned Agent cannot be dispatched safely."""
 

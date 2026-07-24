@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
@@ -20,6 +22,7 @@ from embedded_copilot.firmware.planner.planner import FirmwarePlanner
 from embedded_copilot.firmware.project.generator import FirmwareProjectGenerator
 from embedded_copilot.firmware.project.validator import FirmwareProjectValidator
 from embedded_copilot.firmware.validator import FirmwareValidator
+from embedded_copilot.knowledge.injection import extract_centralized_knowledge
 
 
 class FirmwareAgent(BaseAgent):
@@ -67,30 +70,51 @@ class FirmwareAgent(BaseAgent):
 
     def run(self, task: AgentTask) -> AgentResult:
         try:
+            try:
+                centralized = extract_centralized_knowledge(
+                    task.metadata,
+                    field="knowledge_documents",
+                    model_type=FirmwareDocument,
+                )
+            except Exception as exc:
+                raise FirmwareKnowledgeError(
+                    "firmware knowledge retrieval failed"
+                ) from exc
+            analysis_metadata = (
+                copy.deepcopy(task.metadata)
+                if centralized is None
+                else centralized[0]
+            )
             analysis = self._analyzer.analyze(
                 task.requirement,
-                metadata=task.metadata,
+                metadata=analysis_metadata,
             )
-            documents = [
-                document
-                for document in self._retrieve_documents(task.requirement)
-                if (
-                    analysis.platform is None
-                    or document.platform.casefold() == analysis.platform.casefold()
-                )
-                and (
-                    analysis.framework is None
-                    or document.framework.casefold() == analysis.framework.casefold()
-                )
-            ]
+            if centralized is None:
+                documents = [
+                    document
+                    for document in self._retrieve_documents(task.requirement)
+                    if (
+                        analysis.platform is None
+                        or document.platform.casefold() == analysis.platform.casefold()
+                    )
+                    and (
+                        analysis.framework is None
+                        or document.framework.casefold()
+                        == analysis.framework.casefold()
+                    )
+                ]
+                retrieved_documents = [
+                    document.model_dump(mode="json") for document in documents
+                ]
+            else:
+                documents = centralized[1]
+                retrieved_documents = centralized[2]
             plan = self._planner.plan(analysis, documents)
             project = self._project_generator.generate(plan)
             validation = self._project_validator.validate(project)
             base_metadata = {
                 "firmware_plan": plan.model_dump(mode="json"),
-                "retrieved_documents": [
-                    document.model_dump(mode="json") for document in documents
-                ],
+                "retrieved_documents": retrieved_documents,
             }
             if not validation.success:
                 return AgentResult(

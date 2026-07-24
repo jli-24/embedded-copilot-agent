@@ -79,3 +79,44 @@ def test_analyzer_drops_supervisor_owned_handoff_metadata() -> None:
 def test_analyzer_rejects_invalid_metadata_overrides(metadata: object) -> None:
     with pytest.raises(SupervisorAnalysisError):
         SupervisorRequirementAnalyzer().analyze("firmware", metadata=metadata)
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "debug this ESP32 crash",
+        "analyze the hard fault",
+        "inspect this compile error",
+        "investigate a communication error",
+        "diagnose the runtime failure",
+    ],
+)
+def test_analyzer_routes_only_explicit_failure_intent_to_debug(source: str) -> None:
+    analysis = SupervisorRequirementAnalyzer().analyze(source)
+
+    assert "DebugAgent" in analysis.required_agents
+
+
+def test_analyzer_does_not_route_design_keywords_to_debug() -> None:
+    analysis = SupervisorRequirementAnalyzer().analyze(
+        "Design an ESP32 camera board with GPIO, UART, and power"
+    )
+
+    assert analysis.required_agents == [
+        "FirmwareAgent",
+        "HardwareAgent",
+        "PCBAgent",
+    ]
+
+
+def test_analyzer_adds_debug_when_system_design_has_explicit_failure_intent() -> None:
+    analysis = SupervisorRequirementAnalyzer().analyze(
+        "Design an ESP32 camera board and inspect a compile error"
+    )
+
+    assert analysis.required_agents == [
+        "FirmwareAgent",
+        "HardwareAgent",
+        "PCBAgent",
+        "DebugAgent",
+    ]

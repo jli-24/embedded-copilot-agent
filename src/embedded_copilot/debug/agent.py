@@ -22,6 +22,7 @@ from embedded_copilot.debug.models import (
 )
 from embedded_copilot.debug.planner import DebugPlanner
 from embedded_copilot.debug.validator import DebugValidator
+from embedded_copilot.knowledge.injection import extract_centralized_knowledge
 
 
 _STAGE_FAILURES = {
@@ -75,23 +76,40 @@ class DebugAgent(BaseAgent):
 
     def run(self, task: AgentTask) -> AgentResult:
         try:
+            centralized = extract_centralized_knowledge(
+                task.metadata,
+                field="knowledge_evidence",
+                model_type=DebugEvidence,
+            )
+        except Exception:
+            return self._failure("knowledge_retrieval")
+        analysis_metadata = (
+            copy.deepcopy(task.metadata)
+            if centralized is None
+            else centralized[0]
+        )
+        try:
             raw_request = self._requirement_analyzer.analyze(
                 task.requirement,
-                metadata=copy.deepcopy(task.metadata),
+                metadata=analysis_metadata,
             )
             request = _revalidate(DebugRequest, raw_request)
         except Exception:
             return self._failure("requirement_analysis")
 
         try:
-            raw_documents = self._retriever.retrieve(
-                _revalidate(DebugRequest, request)
-            )
-            documents = _revalidate_sequence(DebugEvidence, raw_documents)
-            document_provenance = [
-                copy.deepcopy(debug_evidence_provenance(document))
-                for document in documents
-            ]
+            if centralized is None:
+                raw_documents = self._retriever.retrieve(
+                    _revalidate(DebugRequest, request)
+                )
+                documents = _revalidate_sequence(DebugEvidence, raw_documents)
+                document_provenance = [
+                    copy.deepcopy(debug_evidence_provenance(document))
+                    for document in documents
+                ]
+            else:
+                documents = _revalidate_sequence(DebugEvidence, centralized[1])
+                document_provenance = copy.deepcopy(centralized[2])
         except Exception:
             return self._failure("knowledge_retrieval")
 

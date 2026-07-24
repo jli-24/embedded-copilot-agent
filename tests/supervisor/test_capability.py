@@ -30,6 +30,7 @@ def test_supervisor_capability_descriptor_and_explicit_registration() -> None:
         "FirmwareAgent",
         "HardwareAgent",
         "PCBAgent",
+        "DebugAgent",
     )
     assert agent_registry.get_agent("SupervisorAgent") is agent
     assert capability_registry.get("supervisor") is descriptor

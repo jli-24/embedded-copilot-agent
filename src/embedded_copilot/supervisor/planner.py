@@ -10,11 +10,12 @@ from embedded_copilot.supervisor.models import (
 )
 
 
-_AGENT_ORDER = ("FirmwareAgent", "HardwareAgent", "PCBAgent")
+_AGENT_ORDER = ("FirmwareAgent", "HardwareAgent", "PCBAgent", "DebugAgent")
 _OBJECTIVES = {
     "FirmwareAgent": "Generate firmware architecture",
     "HardwareAgent": "Create hardware design plan",
     "PCBAgent": "Review PCB constraints",
+    "DebugAgent": "Analyze observed failure evidence",
 }
 
 
@@ -35,9 +36,11 @@ class SupervisorPlanner:
             raise SupervisorPlanningError("supervisor plan requires at least one agent")
 
         project_name = task.project_name or "supervisor_project"
+        public_metadata = copy.deepcopy(task.metadata)
+        public_metadata.pop("_supervisor_knowledge", None)
         invocations: list[AgentInvocation] = []
         for agent_name in ordered_agents:
-            metadata = copy.deepcopy(task.metadata)
+            metadata = copy.deepcopy(public_metadata)
             metadata.update(
                 {
                     "project_name": project_name,

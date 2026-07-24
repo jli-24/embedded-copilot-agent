@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import copy
+
 from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
 from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
 from embedded_copilot.hardware.models import HardwarePlan
+from embedded_copilot.knowledge.injection import extract_centralized_knowledge
 from embedded_copilot.pcb.analyzer import PCBRequirementAnalyzer
 from embedded_copilot.pcb.exceptions import (
     PCBAnalysisError,
@@ -54,8 +57,25 @@ class PCBAgent(BaseAgent):
     def run(self, task: AgentTask) -> AgentResult:
         try:
             source, metadata = self._resolve_source(task)
+            try:
+                centralized = extract_centralized_knowledge(
+                    metadata,
+                    field="knowledge_documents",
+                    model_type=PCBRuleDocument,
+                )
+            except Exception as exc:
+                raise PCBKnowledgeError("PCB knowledge retrieval failed") from exc
+            if centralized is not None:
+                metadata = centralized[0]
             requirement = self._analyze(source, metadata)
-            documents = self._retrieve_documents(_retrieval_query(requirement))
+            if centralized is None:
+                documents = self._retrieve_documents(_retrieval_query(requirement))
+                retrieved_documents = [
+                    _document_provenance(document) for document in documents
+                ]
+            else:
+                documents = centralized[1]
+                retrieved_documents = centralized[2]
             evaluation = self._evaluate_rules(requirement)
             report = self._create_report(requirement, documents, evaluation)
             validation = self._validate_report(report)
@@ -86,9 +106,7 @@ class PCBAgent(BaseAgent):
                 output=report.model_dump_json(),
                 metadata={
                     "pcb_review": report_payload,
-                    "retrieved_documents": [
-                        _document_provenance(document) for document in documents
-                    ],
+                    "retrieved_documents": retrieved_documents,
                     "validation": validation.model_dump(mode="json"),
                 },
             )
@@ -111,7 +129,7 @@ class PCBAgent(BaseAgent):
     def _resolve_source(
         task: AgentTask,
     ) -> tuple[str | HardwarePlan, dict[str, object]]:
-        metadata = dict(task.metadata)
+        metadata = copy.deepcopy(task.metadata)
         plan_payload = metadata.pop("hardware_plan", None)
         if plan_payload is None:
             return task.requirement, metadata

@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.11.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.12.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -407,6 +407,40 @@ Finding。没有知识命中时仍可生成规则报告，但会标记
 修复、编译、烧录，也不控制 GDB/JTAG、设备或实时硬件调试。输出不代表唯一 Root Cause，且未经
 真实构建、设备测量或硬件验证。v0.10.0 未修改 Supervisor、Runtime LangGraph、API routes、
 Tools 或 RAG，也不会自动注册到 Supervisor。
+
+## Supervisor × Knowledge Gateway Integration
+
+v0.12.0 为同步 Foundation Supervisor 增加集中式知识调度：
+
+```text
+AgentTask
+  -> SupervisorRequirementAnalyzer
+  -> KnowledgeQueryBuilder
+  -> KnowledgeGateway
+  -> KnowledgeContext
+  -> SupervisorPlanner
+  -> AgentDispatcher + knowledge adapters
+  -> Firmware / Hardware / PCB / Debug
+  -> SupervisorResultAggregator
+```
+
+`KnowledgeGateway` 只通过 `SupervisorAgent` 构造参数显式注入。Gateway invocation
+ownership belongs exclusively to `SupervisorAgent.run()`；Planner、Dispatcher、知识 adapter
+和领域 Agent 均不会持有或再次调用 Gateway。每次 Supervisor run 最多检索一次，不重试，
+并在调用前后检查 `KnowledgeQuery` 是否被修改。
+
+Supervisor 层 adapter 将 `KnowledgeResult` 转换为 `FirmwareDocument`、
+`HardwareDocument`、`PCBRuleDocument` 或 `DebugEvidence`，Dispatcher 只向 child task
+注入相应领域数据、安全 provenance 和 `knowledge_mode="supervisor_gateway"`。领域 Agent
+不导入 `KnowledgeContext`、`ExecutionContext` 或其他 Supervisor 模型。某领域没有命中时，
+空知识仍是合法集中式输入，不会回退到本地 retriever；未注入 Gateway 时则完整保留 v0.11
+的本地检索路径。
+
+显式 Gateway 路径提供 allowlisted Supervisor trace：`task_parsed`、
+`knowledge_query_built`、`gateway_retrieved`、`context_built`、`agent_routed` 和
+`finished`。Trace 不包含查询、知识正文、原始日志、异常正文、路径、token 或凭据；内部
+`execution_id` 也不会进入公开结果。本版本没有新增 Provider、HTTP、GitHub API、下载、
+LLM 或 LangGraph Runtime，四个领域输出和 Benchmark 公共契约保持不变。
 
 ## Benchmark Evaluation & Regression Architecture
 

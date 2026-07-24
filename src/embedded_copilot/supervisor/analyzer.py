@@ -56,6 +56,17 @@ _AGENT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "接地",
     ),
 }
+_AGENT_KEYWORDS["DebugAgent"] = (
+    "debug",
+    "error",
+    "failure",
+    "failed",
+    "crash",
+    "hard fault",
+    "hardfault",
+    "compile error",
+    "communication error",
+)
 _AGENT_ALIASES = {
     "firmware": "FirmwareAgent",
     "firmwareagent": "FirmwareAgent",
@@ -63,6 +74,8 @@ _AGENT_ALIASES = {
     "hardwareagent": "HardwareAgent",
     "pcb": "PCBAgent",
     "pcbagent": "PCBAgent",
+    "debug": "DebugAgent",
+    "debugagent": "DebugAgent",
 }
 _CANONICAL_ORDER = ("FirmwareAgent", "HardwareAgent", "PCBAgent")
 _DESIGN_KEYWORDS = ("design", "设计", "方案")
@@ -82,6 +95,11 @@ _CONTROL_FIELDS = {
     "constraints",
     "firmware_project",
     "hardware_plan",
+    "knowledge_mode",
+    "knowledge_documents",
+    "knowledge_evidence",
+    "knowledge_provenance",
+    "_supervisor_knowledge",
 }
 
 
@@ -152,7 +170,13 @@ class SupervisorRequirementAnalyzer:
             and any(keyword in normalized for keyword in _PLATFORM_KEYWORDS)
             and any(keyword in normalized for keyword in _SYSTEM_KEYWORDS)
         ):
-            return list(_CANONICAL_ORDER)
+            selected = list(_CANONICAL_ORDER)
+            if any(
+                keyword in normalized
+                for keyword in _AGENT_KEYWORDS["DebugAgent"]
+            ):
+                selected.append("DebugAgent")
+            return selected
 
         matches: list[tuple[int, int, str]] = []
         for order, (agent_name, keywords) in enumerate(_AGENT_KEYWORDS.items()):

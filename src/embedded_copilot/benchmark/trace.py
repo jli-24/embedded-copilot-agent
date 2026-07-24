@@ -35,8 +35,15 @@ class TraceCollector:
         elapsed_ms = round(max(0.0, (self._clock() - started_at) * 1000), 9)
         if target_name == "SupervisorAgent" and execution_succeeded:
             events = self._supervisor_events(result)
+            knowledge_event = self._supervisor_knowledge_event(result)
+            if knowledge_event is not None:
+                events.insert(0, knowledge_event)
+                events = [
+                    event.model_copy(update={"sequence": index})
+                    for index, event in enumerate(events, start=1)
+                ]
             agent_calls = sum(event.event_type == "agent_call" for event in events)
-            knowledge_calls = 0
+            knowledge_calls = int(knowledge_event is not None)
         elif target_name == "KnowledgeGateway":
             events = [
                 TraceEvent(
@@ -73,6 +80,35 @@ class TraceCollector:
                 knowledge_calls=knowledge_calls,
             ),
         )
+
+    @staticmethod
+    def _supervisor_knowledge_event(result: object) -> TraceEvent | None:
+        metadata = copy.deepcopy(getattr(result, "metadata", {}))
+        if not isinstance(metadata, Mapping):
+            return None
+        execution_summary = metadata.get("execution_summary")
+        if not isinstance(execution_summary, Mapping):
+            return None
+        report_metadata = execution_summary.get("metadata")
+        if not isinstance(report_metadata, Mapping):
+            return None
+        raw_trace = report_metadata.get("supervisor_trace")
+        if not isinstance(raw_trace, list):
+            return None
+        for raw_event in raw_trace:
+            if not isinstance(raw_event, Mapping):
+                continue
+            if raw_event.get("stage") != "gateway_retrieved":
+                continue
+            return TraceEvent(
+                sequence=1,
+                event_type="knowledge_call",
+                target="KnowledgeGateway",
+                status=(
+                    "success" if raw_event.get("status") == "success" else "error"
+                ),
+            )
+        return None
 
     @staticmethod
     def _supervisor_events(result: object) -> list[TraceEvent]:

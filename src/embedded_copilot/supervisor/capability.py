@@ -25,6 +25,7 @@ class SupervisorCapabilityDescriptor:
         "FirmwareAgent",
         "HardwareAgent",
         "PCBAgent",
+        "DebugAgent",
     )
 
 

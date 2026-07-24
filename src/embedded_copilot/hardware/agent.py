@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
@@ -22,6 +24,7 @@ from embedded_copilot.hardware.models import (
 )
 from embedded_copilot.hardware.planner import HardwarePlanner
 from embedded_copilot.hardware.validator import HardwareValidator
+from embedded_copilot.knowledge.injection import extract_centralized_knowledge
 
 
 class HardwareAgent(BaseAgent):
@@ -49,8 +52,27 @@ class HardwareAgent(BaseAgent):
     def run(self, task: AgentTask) -> AgentResult:
         try:
             source, metadata = self._resolve_source(task)
+            try:
+                centralized = extract_centralized_knowledge(
+                    metadata,
+                    field="knowledge_documents",
+                    model_type=HardwareDocument,
+                )
+            except Exception as exc:
+                raise HardwareKnowledgeError(
+                    "hardware knowledge retrieval failed"
+                ) from exc
+            if centralized is not None:
+                metadata = centralized[0]
             requirement = self._analyze(source, metadata)
-            documents = self._retrieve_documents(_retrieval_query(requirement))
+            if centralized is None:
+                documents = self._retrieve_documents(_retrieval_query(requirement))
+                retrieved_documents = [
+                    document.model_dump(mode="json") for document in documents
+                ]
+            else:
+                documents = centralized[1]
+                retrieved_documents = centralized[2]
             plan = self._create_plan(requirement, documents)
             validation = self._validate_plan(plan)
             if not validation.success:
@@ -82,9 +104,7 @@ class HardwareAgent(BaseAgent):
                 output=plan.model_dump_json(),
                 metadata={
                     "hardware_plan": plan_payload,
-                    "retrieved_documents": [
-                        document.model_dump(mode="json") for document in documents
-                    ],
+                    "retrieved_documents": retrieved_documents,
                     "validation": validation.model_dump(mode="json"),
                 },
             )
@@ -107,7 +127,7 @@ class HardwareAgent(BaseAgent):
     def _resolve_source(
         task: AgentTask,
     ) -> tuple[str | FirmwareProject, dict[str, object]]:
-        metadata = dict(task.metadata)
+        metadata = copy.deepcopy(task.metadata)
         project_payload = metadata.pop("firmware_project", None)
         if project_payload is None:
             return task.requirement, metadata

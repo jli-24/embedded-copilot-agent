@@ -1,5 +1,52 @@
 # Embedded Copilot Agent v0.1 Architecture
 
+## v0.12 Foundation Supervisor Knowledge Flow
+
+```text
+User / AgentTask
+  |
+  v
+SupervisorAgent.run()
+  |
+  +--> SupervisorRequirementAnalyzer
+  +--> KnowledgeQueryBuilder
+  +--> KnowledgeGateway.search()  [0..1 call per run]
+  +--> KnowledgeContext
+  +--> SupervisorPlanner
+  +--> AgentDispatcher
+         |
+         +--> supervisor knowledge adapters
+         +--> FirmwareAgent
+         +--> HardwareAgent
+         +--> PCBAgent
+         `--> DebugAgent
+  |
+  v
+SupervisorResultAggregator
+```
+
+Gateway invocation ownership belongs exclusively to `SupervisorAgent.run()`。
+Planner、Dispatcher、adapter 和领域 Agent 均不得持有或调用 Gateway。Supervisor 在调用
+Gateway 前重新验证并 deep copy query，在调用后比较稳定快照；Gateway 返回值按当前公开
+契约重新验证，保持原顺序，不重新 rank 或 deduplicate。
+
+`ExecutionContext` 是 Supervisor 内部的 frozen 传递对象，包含原始 task 的独立副本、
+`KnowledgeContext`、受限 trace 和每次执行生成的 `execution_id`。它不会整体序列化到
+`AgentTask.metadata`。Dispatcher 的内部 contextual path 通过 Supervisor 层 adapter 将
+结果转换为领域模型，只注入最小知识输入、安全 provenance 和 centralized mode 标记。
+
+依赖方向固定为：
+
+```text
+Supervisor -> KnowledgeGateway -> KnowledgeResult
+           -> knowledge adapters -> domain models -> domain Agents
+```
+
+领域 Agent 不依赖 Supervisor context 模型。显式 Gateway 模式下，即使某领域过滤结果为空，
+也不会回退本地 retriever；`knowledge_gateway=None` 时仍执行 v0.11 原路径。显式 Gateway
+trace 仅包含 `stage`、`status`、`target`、`domains` 和 `count`。该集成不增加 Provider、
+网络访问、LLM 或 LangGraph Runtime。
+
 ## Runtime Flow
 
 ```text

@@ -90,3 +90,39 @@ def create_synthetic_foundation_dataset() -> BenchmarkDataset:
         ),
     ]
     return BenchmarkDataset("synthetic-foundation", cases)
+
+
+def create_synthetic_knowledge_injection_dataset() -> BenchmarkDataset:
+    return BenchmarkDataset(
+        "synthetic-knowledge-injection",
+        [
+            BenchmarkCase(
+                id="synthetic-knowledge-injection",
+                name="Synthetic centralized knowledge injection",
+                category="end_to_end",
+                input=(
+                    "Design a synthetic ESP32 ESP-IDF camera system with firmware "
+                    "code, hardware components, PCB layout, and inspect compile "
+                    "error undefined reference to camera_init."
+                ),
+                expected={
+                    "agents": [
+                        "FirmwareAgent",
+                        "HardwareAgent",
+                        "PCBAgent",
+                        "DebugAgent",
+                    ],
+                    "capabilities": ["firmware", "hardware", "pcb", "debug"],
+                },
+                metadata={
+                    "fixture_kind": "synthetic",
+                    "required_agents": [
+                        "firmware",
+                        "hardware",
+                        "pcb",
+                        "debug",
+                    ],
+                },
+            )
+        ],
+    )

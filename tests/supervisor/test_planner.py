@@ -57,3 +57,25 @@ def test_planner_rejects_mixed_canonical_and_unknown_required_agents() -> None:
 
     with pytest.raises(SupervisorPlanningError, match="unknown agent"):
         SupervisorPlanner().plan(task)
+
+
+def test_planner_consumes_but_never_exports_private_knowledge_namespace() -> None:
+    plan = SupervisorPlanner().plan(
+        SupervisorTask(
+            request="firmware",
+            required_agents=["FirmwareAgent"],
+            metadata={
+                "_supervisor_knowledge": {
+                    "domains": ["firmware"],
+                    "result_count": 1,
+                    "categories": ["example"],
+                    "has_results": True,
+                },
+                "keep": "public metadata",
+            },
+        )
+    )
+
+    serialized = plan.model_dump_json()
+    assert "_supervisor_knowledge" not in serialized
+    assert "public metadata" in serialized
