@@ -20,3 +20,7 @@ class PCBReviewError(PCBIntelligenceError):
 
 class PCBValidationError(PCBIntelligenceError):
     """Raised when a PCB review report cannot be validated safely."""
+
+
+class PCBParseError(PCBIntelligenceError):
+    """Raised when an EDA attachment cannot be parsed safely."""

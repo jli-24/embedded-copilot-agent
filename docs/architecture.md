@@ -1,4 +1,35 @@
-# Embedded Copilot Agent v0.1 Architecture
+# Embedded Copilot Agent v0.16 Architecture
+
+## v0.16 PCB Intelligence Foundation Flow
+
+```text
+trusted root + explicit attachment-id mapping
+  -> PCBSourceResolver
+  -> KiCadPCBParser [single-target, read-only, bounded]
+  -> UnifiedPCBModel [immutable structure exchange model]
+  -> PCB evidence rules [deterministic, evidence-only]
+  -> PCB analysis adapter [private frozen envelope]
+  -> unchanged PCBAgent.run(AgentTask)
+  -> unchanged PCBReviewReport schema
+```
+
+Parser 与 Agent 分层。`pcb/parser` 只依赖 `UserAttachment`、PCB parser contracts 和
+`UnifiedPCBModel`，不依赖 PCBAgent、Supervisor、Knowledge Gateway 或 Provider。Resolver
+不扫描 root；它只把 attachment id 映射到一个相对目标。Parser 重新验证 root containment、
+basename、EDA type、MIME、size、regular-file 和 symlink，随后以 read-only 模式读取该目标一次。
+原始 bytes、text 和 S-expression AST 只存在于单次 `parse()` 调用栈，不写入对象状态、缓存、
+索引、中间文件或日志。
+
+`UnifiedPCBModel` 是跨 Parser、Rule 和 Agent Adapter 的唯一 PCB 结构模型。其 components、pins、
+nets、nodes、layers、tracks、vias 和 zones 使用 frozen nested model 与 tuple，metadata 在
+deep-copy 后限制为只读 scalar。Parser 对不完整或超出已支持 KiCad 子集的结构安全失败，不通过
+目录搜索或宽松猜测扩大解析范围。
+
+结构规则只输出 power-net、ground-net 和 floating-pin evidence，不生成 risk score 或 LLM
+recommendation；同一模型输入产生完全一致的有序结果。Adapter 使用固定映射生成旧
+`PCBRuleEvaluation`，并通过不可伪造的私有 envelope 注入现有 `AgentTask.metadata`。PCBAgent
+不读取文件、不解析 KiCad，只消费 `UnifiedPCBModel`；legacy text 和 HardwarePlan 路径保持不变。
+该 Foundation 不执行 DRC、电气验证、Vision、OCR、自动布线或 EDA 写回。
 
 ## v0.15 Multimodal Input Foundation Flow
 
@@ -32,9 +63,9 @@ payload 不能伪装成 context。Planner 和 Dispatcher 不传播 context，领
 Provider Contract、Benchmark public models 与原 `AgentTask` schema 保持不变。附件类型不参与
 v0.15 routing；路由仍由现有 deterministic text rules 决定。
 
-`embedded_copilot.multimodal` 的旧 PDF、image 和 text content processors 不在该数据流中，本版本
-不调用、不迁移、不修改。v0.16 PCB Parser 与 v0.17 Datasheet Intelligence 是未来独立设计范围，
-不属于 v0.15。
+`embedded_copilot.multimodal` 的旧 PDF、image 和 text content processors 不在该数据流中，
+不调用、不迁移、不修改。PCB 内容解析属于上面的独立 v0.16 Parser 边界；v0.17 Datasheet
+Intelligence 仍是未来独立设计范围。
 
 ## v0.14 GitHub Provider Flow
 

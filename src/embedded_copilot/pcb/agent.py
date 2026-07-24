@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import copy
-
 from pydantic import ValidationError
 
 from embedded_copilot.agents.base import BaseAgent
 from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
 from embedded_copilot.hardware.models import HardwarePlan
 from embedded_copilot.knowledge.injection import extract_centralized_knowledge
+from embedded_copilot.pcb.adapters import adapt_pcb_model, _consume_pcb_model
 from embedded_copilot.pcb.analyzer import PCBRequirementAnalyzer
 from embedded_copilot.pcb.exceptions import (
     PCBAnalysisError,
@@ -24,6 +23,7 @@ from embedded_copilot.pcb.models import (
     PCBReviewReport,
     PCBRuleEvaluation,
     PCBValidationResult,
+    UnifiedPCBModel,
 )
 from embedded_copilot.pcb.reviewer import PCBReviewer
 from embedded_copilot.pcb.rules import PCBRuleEngine
@@ -67,7 +67,11 @@ class PCBAgent(BaseAgent):
                 raise PCBKnowledgeError("PCB knowledge retrieval failed") from exc
             if centralized is not None:
                 metadata = centralized[0]
-            requirement = self._analyze(source, metadata)
+            if isinstance(source, UnifiedPCBModel):
+                requirement, evaluation = adapt_pcb_model(source)
+            else:
+                requirement = self._analyze(source, metadata)
+                evaluation = self._evaluate_rules(requirement)
             if centralized is None:
                 documents = self._retrieve_documents(_retrieval_query(requirement))
                 retrieved_documents = [
@@ -76,8 +80,12 @@ class PCBAgent(BaseAgent):
             else:
                 documents = centralized[1]
                 retrieved_documents = centralized[2]
-            evaluation = self._evaluate_rules(requirement)
-            report = self._create_report(requirement, documents, evaluation)
+            report = self._create_report(
+                requirement,
+                documents,
+                evaluation,
+                pcb_model=source if isinstance(source, UnifiedPCBModel) else None,
+            )
             validation = self._validate_report(report)
             if not validation.success:
                 return AgentResult(
@@ -128,8 +136,14 @@ class PCBAgent(BaseAgent):
     @staticmethod
     def _resolve_source(
         task: AgentTask,
-    ) -> tuple[str | HardwarePlan, dict[str, object]]:
-        metadata = copy.deepcopy(task.metadata)
+    ) -> tuple[str | HardwarePlan | UnifiedPCBModel, dict[str, object]]:
+        metadata, pcb_model = _consume_pcb_model(task.metadata)
+        if pcb_model is not None:
+            if "hardware_plan" in metadata:
+                raise PCBAnalysisError(
+                    "PCB model context cannot be combined with a hardware plan"
+                )
+            return pcb_model, metadata
         plan_payload = metadata.pop("hardware_plan", None)
         if plan_payload is None:
             return task.requirement, metadata
@@ -195,13 +209,23 @@ class PCBAgent(BaseAgent):
         requirement: PCBRequirement,
         documents: list[PCBRuleDocument],
         evaluation: PCBRuleEvaluation,
+        *,
+        pcb_model: UnifiedPCBModel | None,
     ) -> PCBReviewReport:
         try:
-            report = self._reviewer.review(
-                requirement,
-                documents,
-                evaluation=evaluation,
-            )
+            if pcb_model is None:
+                report = self._reviewer.review(
+                    requirement,
+                    documents,
+                    evaluation=evaluation,
+                )
+            else:
+                report = self._reviewer.review_structured(
+                    requirement,
+                    documents,
+                    evaluation=evaluation,
+                    pcb_model=pcb_model,
+                )
             if not isinstance(report, PCBReviewReport):
                 raise TypeError("reviewer returned an invalid report")
             return report

@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.15.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.16.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -379,9 +379,37 @@ Dispatcher、FirmwareAgent、HardwareAgent、PCBAgent、DebugAgent、KnowledgeGa
 Provider 均不接收 `UserAttachment`。
 
 现有 `embedded_copilot.multimodal` 是早期内容处理实现，会读取文本并解析 PDF/图片，不属于
-v0.15 安全输入链路，本版本不调用、不迁移也不修改它。v0.15 不包含 Vision、OCR、PDF/Datasheet
-解析、EDA/PCB 解析、LLM 总结或文件内容理解。计划中的 v0.16 PCB Parser 与 v0.17 Datasheet
-Intelligence 必须分别完成范围、安全和测试设计后才能接入。
+v0.15 安全输入链路，后续版本仍不调用、不迁移也不修改它。Input Layer 不包含 Vision、OCR、
+PDF/Datasheet 解析、EDA 内容解析、LLM 总结或文件内容理解。
+
+## PCB Intelligence Foundation
+
+v0.16.0 在 Input Layer 之外新增独立、只读的 KiCad PCB 结构解析链：
+
+```text
+InputLoader -> UserAttachment(type=EDA)
+            -> RootedPCBSourceResolver
+            -> KiCadPCBParser
+            -> UnifiedPCBModel
+            -> attach_pcb_model()
+            -> PCBAgent
+            -> PCBReviewReport
+```
+
+`PCBSourceResolver` 通过 attachment id 显式映射可信 root 下的相对目标，Parser 不扫描目录，只
+读取该 attachment 对应的单个 `.kicad_pcb` 文件。Parser 使用有 size、token 和 nesting-depth
+上限的 S-expression 子集解析器，提取 component、pin、net、layer、track、via 和基础 zone；
+不修改 EDA 文件，不保存原始内容或 AST，不创建缓存、索引、中间文件，也不访问 Agent、
+Supervisor、Knowledge Gateway 或网络。
+
+`UnifiedPCBModel` 是唯一 PCB 结构交换模型，所有 collection 和 nested model 均不可变，metadata
+在 deep-copy 后限制为只读 scalar。结构规则只产生确定性 evidence；`pcb.adapters` 再把 evidence
+映射为稳定的 `PCBRuleEvaluation`，通过私有 envelope 交给保持原签名的 `PCBAgent.run(task)`。
+旧 text-only 和 HardwarePlan 调用继续工作，`PCBReviewReport` JSON schema 不变。
+
+该能力不是 KiCad 完整规范实现，也不包含 Vision、OCR、LLM PCB 判断、自动布线、EDA 写回或
+DRC 替代。解析不完整或不受支持的输入会安全失败；报告中的结论必须在 EDA 工具和真实工程
+环境中独立验证。
 
 ## GitHub Engineering Knowledge Provider
 

@@ -9,6 +9,7 @@ from embedded_copilot.pcb.models import (
     PCBRequirement,
     PCBReviewReport,
     PCBRuleEvaluation,
+    UnifiedPCBModel,
 )
 from embedded_copilot.pcb.rules import PCBRuleEngine
 
@@ -75,3 +76,35 @@ class PCBReviewer:
     def review_hardware_plan(self, plan: HardwarePlan) -> PCBReviewReport:
         requirement = self._analyzer.analyze(plan)
         return self.review(requirement, [])
+
+    def review_structured(
+        self,
+        requirement: PCBRequirement,
+        documents: Sequence[PCBRuleDocument],
+        *,
+        evaluation: PCBRuleEvaluation,
+        pcb_model: UnifiedPCBModel,
+    ) -> PCBReviewReport:
+        """Compose a stable report from parsed structure evidence without DRC."""
+        return PCBReviewReport(
+            project_name=requirement.project_name,
+            platform=requirement.platform,
+            issues=list(evaluation.issues),
+            passed_rules=list(evaluation.passed_rules),
+            warnings=[
+                "PCB structure analysis is deterministic and unverified.",
+                "EDA connectivity, DRC, and electrical behavior require independent verification.",
+            ],
+            summary=(
+                "Deterministic review of parsed KiCad PCB structure completed; "
+                "DRC was not executed and the EDA file was not modified."
+            ),
+            metadata={
+                "review_mode": "deterministic_structured",
+                "source_format": pcb_model.source_format,
+                "component_count": len(pcb_model.components),
+                "net_count": len(pcb_model.nets),
+                "evidence_document_ids": [document.id for document in documents],
+                "rule_count": len(evaluation.issues) + len(evaluation.passed_rules),
+            },
+        )
