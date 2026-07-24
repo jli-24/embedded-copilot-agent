@@ -1,257 +1,153 @@
-# v0.11.0 Benchmark Evaluation Layer Design
+# v0.11.0 Benchmark Evaluation & Regression Layer Design
 
-## 1. Goal and Boundaries
+## 1. Goal and Isolation Boundary
 
-v0.11.0 adds an independent, synchronous, deterministic evaluation layer under
-`embedded_copilot.benchmark`:
+v0.11.0 adds an independent, synchronous, offline, deterministic external
+observer under `embedded_copilot.benchmark`:
 
 ```text
-BenchmarkDataset
+Synthetic BenchmarkDataset
   -> BenchmarkRunner
-  -> Supervisor / Foundation Domain Agent / KnowledgeGateway
+  -> Explicitly Injected Targets
+  -> TraceCollector
   -> BenchmarkEvaluator
   -> BenchmarkReportBuilder
   -> BenchmarkReport
+  -> BenchmarkBaseline / RegressionComparator
 ```
 
-The layer evaluates existing Foundation behavior without changing the evaluated
-components. It does not modify FirmwareAgent, HardwareAgent, PCBAgent,
-DebugAgent, SupervisorAgent, or KnowledgeGateway. It does not add a Runtime
-Agent, LangGraph node, API route, Web UI, LLM judge, online dataset, training
-data generator, model optimizer, filesystem scanner, or network client.
+Benchmark only invokes, observes, and scores caller-owned targets. It never
+creates or changes an Agent, calls Supervisor from an Agent, registers with
+`AgentRegistry`, changes Supervisor routing, or enters a production execution
+path. It does not add a Runtime Agent, LangGraph node, API route, Tool, network
+client, LLM judge, training-data generator, model optimizer, filesystem scanner,
+or Retriever implementation.
 
-The package exports `BenchmarkRunner` from `embedded_copilot.benchmark`. It
-does not create `embedded_copilot.agents.benchmark` and does not auto-register
-anything on import.
+`import embedded_copilot.benchmark` exports only `BenchmarkRunner`. Importing
+the package does not import or initialize Runtime Agents, LangGraph Workflow,
+API modules, production Registries, targets, datasets, capability registration,
+or the reserved CLI. Target contracts and domain output models are imported
+only inside an explicit run or evaluation call. No global Runner, Dataset,
+Evaluator, Registry, or target is created.
 
-## 2. Public Contracts
+## 2. Models and Dataset
 
 All public models inherit `ContractModel`, remain frozen, forbid extra fields,
-strip string fields, stably deduplicate string lists case-insensitively, reject
-NaN/Inf, and isolate nested mutable values through revalidation and deep copies
-at every pipeline boundary.
+strip contract strings, reject non-finite values, stably deduplicate string
+lists case-insensitively, and isolate nested mutable values through validation
+and deep copies:
 
-```python
-BenchmarkCategory = Literal[
-    "routing",
-    "firmware",
-    "hardware",
-    "pcb",
-    "debug",
-    "knowledge",
-    "end_to_end",
-]
+- `BenchmarkCase`, `BenchmarkResult`, `BenchmarkReport`
+- `TraceEvent`, `BenchmarkTrace`, `ExecutionMetrics`
+- `BenchmarkBaseline`, `RegressionReport`
 
-class BenchmarkCase(ContractModel):
-    id: str
-    name: str
-    category: BenchmarkCategory
-    input: str
-    expected: dict[str, object]
-    metadata: dict[str, object]
+Result scores and report metrics are in `[0, 1]`. A successful result has no
+errors; a failed result has at least one fixed safe error. Reports validate
+case counts, unique case IDs, result outcomes, and the calculated average.
 
-class BenchmarkResult(ContractModel):
-    case_id: str
-    success: bool
-    score: float
-    metrics: dict[str, float]
-    errors: list[str]
-    metadata: dict[str, object]
+`BenchmarkDataset` preserves insertion order and exposes `from_json`,
+`add_case`, `list_cases`, and `get_case`. JSON strings and bytes are data, never
+paths. Dataset operations do not read or scan the filesystem. Duplicate IDs
+are rejected case-insensitively, and stored cases cannot be changed through a
+returned nested object.
 
-class BenchmarkReport(ContractModel):
-    name: str
-    total_cases: int
-    passed_cases: int
-    failed_cases: int
-    average_score: float
-    metrics: dict[str, float]
-    results: list[BenchmarkResult]
-    summary: str
-    metadata: dict[str, object]
-```
+`benchmark.datasets.synthetic` provides explicit Python fixtures for routing,
+firmware, hardware, pcb, debug, knowledge, and end-to-end evaluation. Fixtures
+contain only synthetic requests and expectations: no real document, source
+code, device log, private information, credential, machine path, or online
+derived content.
 
-`BenchmarkResult.score` and every metric are in `[0, 1]`. A successful result
-has no errors; a failed result has at least one fixed, safe error. A report
-validates that `total_cases == passed_cases + failed_cases == len(results)`,
-case IDs are unique case-insensitively, pass/fail counts agree with result
-statuses, and `average_score` agrees with the result mean.
-
-The exception hierarchy is `BenchmarkError` with
-`BenchmarkDatasetError`, `BenchmarkRunError`, `BenchmarkEvaluationError`, and
-`BenchmarkReportError` subclasses. Registration conflicts continue to use the
-existing registry's `ValueError` behavior.
-
-## 3. Dataset and Target Execution
-
-`BenchmarkDataset` owns an insertion-ordered collection of cases:
-
-```python
-BenchmarkDataset(
-    name: str,
-    cases: Sequence[BenchmarkCase] = (),
-)
-
-BenchmarkDataset.from_json(
-    payload: str | bytes | Mapping[str, object],
-) -> BenchmarkDataset
-
-add_case(case: BenchmarkCase) -> None
-list_cases() -> list[BenchmarkCase]
-get_case(case_id: str) -> BenchmarkCase
-```
-
-The JSON value has the exact top-level shape `{"name": str, "cases": list}`.
-The package never interprets a string as a path and never reads or scans the
-filesystem. Duplicate IDs are rejected case-insensitively. Add, list, and get
-revalidate deep copies so caller mutation cannot change stored cases.
-
-`BenchmarkRunner` uses explicit target injection and never creates an Agent or
-Gateway:
+## 3. Runner and Trace
 
 ```python
 BenchmarkRunner(
-    targets: Mapping[str, object],
-    *,
-    evaluator: BenchmarkEvaluator | None = None,
-    report_builder: BenchmarkReportBuilder | None = None,
+    targets,
+    evaluator=None,
+    trace_collector=None,
+    report_builder=None,
 )
-
-run(dataset: BenchmarkDataset) -> BenchmarkReport
 ```
 
-The supported target keys are `SupervisorAgent`, `FirmwareAgent`,
-`HardwareAgent`, `PCBAgent`, `DebugAgent`, and `KnowledgeGateway`. A runner may
-receive only the subset needed by its dataset. Category routing is fixed:
+Targets are explicitly injected. Categories map to `SupervisorAgent`,
+`FirmwareAgent`, `HardwareAgent`, `PCBAgent`, `DebugAgent`, or
+`KnowledgeGateway`. Agent calls receive a new deep-copied `AgentTask` with
+`task_id="benchmark:<case.id>"`; knowledge calls receive a revalidated
+`KnowledgeQuery`. The Runner never constructs one of those targets.
 
-- `routing` and `end_to_end` -> `SupervisorAgent`
-- `firmware` -> `FirmwareAgent`
-- `hardware` -> `HardwareAgent`
-- `pcb` -> `PCBAgent`
-- `debug` -> `DebugAgent`
-- `knowledge` -> `KnowledgeGateway`
+Cases run sequentially, without concurrency, retry, or duplicate execution.
+A missing target, target exception, failed envelope, malformed output, invalid
+expected contract, or evaluator failure becomes a score-zero safe result and
+does not stop later cases. An empty/malformed Dataset or report assembly
+failure rejects the run without returning a partial report.
 
-Agent targets receive a new deep-copied `AgentTask` with task ID
-`benchmark:<case.id>`, task type equal to the category, requirement equal to
-`case.input`, and metadata copied from the case. Knowledge targets receive a
-`KnowledgeQuery`; `sources` and `top_k` are optional reserved metadata keys and
-all remaining metadata becomes query metadata.
+`TraceCollector` uses an injectable monotonic clock. It observes Supervisor
+call order and statuses from returned `supervisor_plan.tasks` and
+`agent_results`, and derives handoffs between adjacent tasks. A handoff success
+means only that both returned adjacent results are successful; it does not claim
+an internal state mutation occurred. Non-Supervisor Agents produce one call
+event, and KnowledgeGateway produces one knowledge-call event.
 
-Cases execute sequentially in dataset order. Target input, returned output,
-case data, and stored dataset state are revalidated and isolated. A missing
-target, target exception, `AgentStatus.ERROR`, malformed result, invalid
-expected contract, or evaluator exception produces a score-zero failed
-`BenchmarkResult` and does not stop later cases. Running an empty or malformed
-dataset, or failing to assemble a valid report, raises a safe benchmark
-exception and does not return a partial report.
+`ExecutionMetrics` records execution time, Agent call count, and knowledge call
+count. Raw Trace and timing never enter BenchmarkReport, preserving repeatable
+reports and hashes. Token metrics are not collected.
 
-The runner does not execute a case twice. Determinism means repeated runs over
-the same immutable dataset and deterministic injected targets produce identical
-reports; tests enforce that contract.
+## 4. Deterministic Evaluation and Reporting
 
-## 4. Deterministic Evaluation
+Expected dictionaries reject missing and extra fields:
 
-`BenchmarkEvaluator.evaluate(case: BenchmarkCase, result: object) ->
-BenchmarkResult` selects a category evaluator and first revalidates the target
-envelope and typed domain output. Category-specific `expected` dictionaries
-forbid missing and extra keys:
-
-| Category | Exact expected fields | Metrics |
+| Category | Exact fields | Metrics |
 |---|---|---|
-| `routing` | `agents: list[str]` | `agent_selection_accuracy` is 1 only when the SupervisorPlan task Agent set exactly matches the expected set |
-| `firmware` | `platform: str`, `components: list[str]`, `templates: list[str]` | `platform_accuracy`; `component_coverage` over `FirmwareProject.metadata.components + peripherals`; `template_coverage` over file paths |
-| `hardware` | `component_keywords: list[str]`, `interfaces: list[str]`, `constraint_keywords: list[str]` | keyword coverage over component names; exact interface coverage; keyword coverage over constraints |
-| `pcb` | `rules: list[str]`, `issue_ids: list[str]`, `severities: dict[str, str]` | rule coverage over passed rules and issue IDs; issue coverage; expected issue severity accuracy |
-| `debug` | `error_type: str`, `finding_ids: list[str]`, `recommendation_keywords: list[str]` | exact error type accuracy; finding ID coverage; recommendation keyword coverage |
-| `knowledge` | `ranked_ids: list[str]`, `sources: dict[str, str]` | retrieval hit rate; expected source accuracy; same-position ranking accuracy |
-| `end_to_end` | `agents: list[str]` | exact SupervisorPlan Agent selection plus expected-Agent completion coverage from SupervisorResult |
+| routing | `agents`, `capabilities` | Agent selection, capability coverage |
+| firmware | `platform`, `components`, `templates` | Platform/component/template |
+| hardware | `component_keywords`, `interfaces`, `constraint_keywords` | Component/interface/constraint |
+| pcb | `rules`, `issue_ids`, `severities` | Rule/issue/severity |
+| debug | `error_type`, `finding_ids`, `recommendation_keywords` | Error type/finding/recommendation |
+| knowledge | `ranked_ids`, `sources` | Hit/source/ranking/Recall@K/MRR |
+| end_to_end | `agents`, `capabilities` | Selection/capability/completion/handoff |
 
-All comparisons strip strings and compare case-insensitively. Keyword checks are
-deterministic substring checks. Empty optional expectation lists or mappings
-score 1 because nothing is required, but routing/end-to-end Agent lists and the
-knowledge ranked ID list must be non-empty.
+All comparisons strip strings and compare case-insensitively. Recall@K uses
+`K=len(expected.ranked_ids)`, and MRR is the reciprocal rank of the first
+expected hit. A category score is the equal-weight mean of its emitted metrics;
+a case passes only when execution is valid and every metric is exactly `1.0`.
 
-The metric utilities expose:
+`CapabilityCoverageMetric` maps `firmware`, `hardware`, `pcb`, and `debug` to
+their Foundation Agent names. It returns matched required capabilities divided
+by required capabilities. Empty or unknown required capability chains fail
+validation; this metric measures coverage, not order.
 
-```python
-AccuracyMetric.compute(expected: object, actual: object) -> float
-CoverageMetric.compute(
-    expected: Sequence[str],
-    actual: Sequence[str],
-    *,
-    substring: bool = False,
-) -> float
-PassRateMetric.compute(passed: int, total: int) -> float
-ScoreAggregator.aggregate(scores: Sequence[float]) -> float
-```
+Report metrics average each metric only across cases that emit it, then add
+`pass_rate`. Result metadata contains only `category` and `target_name`; Report
+metadata contains only `evaluation_mode`, `category_counts`, and
+`trace_enabled`. Inputs, raw target outputs, generated code, debug logs,
+knowledge content, tracebacks, secrets, machine paths, and raw exceptions never
+enter results or reports.
 
-All metric utilities reject invalid, negative, non-finite, or above-one values.
-Each category's case score is the equal-weight arithmetic mean of its fixed
-metrics. A case succeeds only if target execution and output validation succeed
-and every applicable metric is exactly `1.0`. Partial matches retain their
-fractional score and list each below-perfect metric using a fixed error string.
-Every result metadata dictionary contains only `category` and `target_name`;
-it never carries the raw case, input, expected dictionary, or target output.
+## 5. Baseline, Capability, CLI, and Release
 
-`BenchmarkReportBuilder.build(name, results)` preserves result order, computes
-pass/fail totals, averages case scores, and averages each metric only across
-results that contain that metric. The report metrics also contain `pass_rate`,
-computed from the final pass/fail counts. It adds only deterministic evaluation
-mode and category counts to metadata. The fixed summary is:
+`BenchmarkBaseline` contains `benchmark_version`,
+`evaluated_project_version`, `schema_version`, `report_hash`, `metrics_hash`,
+and the metric snapshot. `CURRENT_BASELINE_SCHEMA_VERSION` starts at `1`.
+Canonical, sorted compact JSON is hashed with SHA-256. `report_hash` covers the
+whole Report; `metrics_hash` covers report metrics plus average score.
 
-```text
-Benchmark '<name>' completed <total> case(s): <passed> passed, <failed> failed; average score <score:.3f>.
-```
+Regression compares the union of baseline/current metrics with missing values
+treated as zero. A delta below `-1e-12` is a regression and a delta above
+`1e-12` is an improvement. A baseline whose schema version differs from the
+current constant is rejected with a safe error; no implicit migration occurs.
 
-Reports never include complete Agent inputs or outputs, generated source code,
-debug logs, knowledge content, traceback text, local paths, or raw exceptions.
+`BenchmarkCapabilityDescriptor` advertises BenchmarkRunner and the five Agent
+target names. Registration is explicit and writes only the caller's
+`CapabilityRegistry`; it never accepts or writes `AgentRegistry`.
 
-## 5. Capability, Tests, Version, and Release
+`python -m embedded_copilot.benchmark.run` is a reserved boundary. The v0.11.0
+module has no import effect and returns status `2` with a fixed not-implemented
+message. It defines no Dataset I/O and adds no dependency.
 
-`BenchmarkCapability` is runtime-checkable. The frozen, slotted descriptor has:
-
-```python
-name = "benchmark"
-agent_name = "BenchmarkRunner"
-supported_targets = (
-    "SupervisorAgent",
-    "FirmwareAgent",
-    "HardwareAgent",
-    "PCBAgent",
-    "DebugAgent",
-)
-```
-
-KnowledgeGateway remains a non-Agent executor and is not advertised in the
-Agent target tuple. Registration is explicit:
-
-```python
-register_benchmark_foundation(
-    capability_registry: CapabilityRegistry,
-    *,
-    runner: BenchmarkRunner,
-    capability: BenchmarkCapability | None = None,
-) -> BenchmarkRunner
-```
-
-The function prevalidates the capability name, rejects duplicates before any
-write, registers only the descriptor in `CapabilityRegistry`, and returns the
-caller-owned runner. It never writes `AgentRegistry` or a global registry.
-
-Tests under `tests/benchmark/` use TDD and cover model invariants, dataset deep
-copy and JSON parsing, duplicate IDs, all seven category evaluators, score
-bounds, report aggregation and summary, sequential order, repeated-run
-determinism, mutation isolation, target failures and malformed outputs,
-KnowledgeQuery construction, capability conflicts, and public import
-compatibility. The existing 551 tests remain unchanged and passing.
-
-Version literals in the package, Settings, Health response, `pyproject.toml`,
-and their assertions move together to `0.11.0`. README gains the Benchmark
-Evaluation Architecture and explicitly documents the offline, no-LLM,
-no-training, no-model-optimization limits.
-
-Release gates are, in order: Python version, focused benchmark tests, full
-pytest suite, compileall, Ruff, independent code review, scope/diff/generated
-artifact/secret/path audit, staged diff check, commit
-`feat: add benchmark evaluation layer`, annotated tag `v0.11.0`, then
-`git push origin main --tags`. Any failure stops the release and must not be
-reported as complete.
+Tests cover all category metrics, model and Dataset invariants, mutation
+isolation, sequential execution, single invocation, failure continuation,
+Trace order, Baseline hashes and schema invalidation, report aggregation,
+Capability conflicts, CLI behavior, import isolation, and sensitive-data
+redaction. Version literals move together to `0.11.0`. Release requires focused
+and full pytest, compileall, Ruff, independent review, scope and artifact audit,
+staged diff validation, commit, annotated tag, and push. Any failed gate stops
+the release.

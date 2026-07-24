@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.10.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.11.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -407,6 +407,44 @@ Finding。没有知识命中时仍可生成规则报告，但会标记
 修复、编译、烧录，也不控制 GDB/JTAG、设备或实时硬件调试。输出不代表唯一 Root Cause，且未经
 真实构建、设备测量或硬件验证。v0.10.0 未修改 Supervisor、Runtime LangGraph、API routes、
 Tools 或 RAG，也不会自动注册到 Supervisor。
+
+## Benchmark Evaluation & Regression Architecture
+
+v0.11.0 新增独立、同步、离线且确定性的外部评估层：
+
+```text
+Synthetic BenchmarkDataset -> BenchmarkRunner -> Explicitly Injected Targets
+                           -> TraceCollector -> BenchmarkEvaluator
+                           -> BenchmarkReportBuilder -> BenchmarkReport
+                           -> BenchmarkBaseline / RegressionComparator
+```
+
+`embedded_copilot.benchmark.BenchmarkRunner` 只调用使用方显式注入的
+`SupervisorAgent`、Foundation Agent 或 `KnowledgeGateway`。Benchmark 不创建 Agent、
+不修改 Agent 行为、不写入 `AgentRegistry`、不接入 Supervisor 或 LangGraph，也不改变
+API、Tools、RAG 或生产执行路径。导入 package 只公开 `BenchmarkRunner`，不会导入或初始化
+Runtime Agents、Workflow、API、production Registries、datasets 或 CLI。
+
+Golden Dataset 通过 `embedded_copilot.benchmark.datasets.synthetic` 显式创建，只包含
+synthetic fixtures，不读取文件路径或扫描目录，也不包含真实文档、源码、设备日志、私有信息
+或在线派生数据。Runner 顺序执行，每个 case 只调用一次；case 级失败被隔离为安全的零分结果，
+不会把原始输入、Agent output、生成代码、Debug 日志、知识正文、traceback、凭据或机器路径写入
+`BenchmarkResult`/`BenchmarkReport`。
+
+确定性指标覆盖 Foundation routing、Firmware、Hardware、PCB、Debug、Knowledge 和
+end-to-end pipeline。Knowledge 评估包含 hit rate、source accuracy、ranking accuracy、
+Recall@K 和 MRR；Trace 只观察 Supervisor 已返回的 plan/results metadata，用于 completion 与
+handoff 评分，不回调 Supervisor。执行时间和原始 Trace 不进入 Report，因此报告及其 hash
+可稳定复现。
+
+`BenchmarkBaseline` 同时记录 `benchmark_version`、`evaluated_project_version`、
+`schema_version`、`report_hash` 和 `metrics_hash`。Regression comparison 在 schema version
+不兼容时明确拒绝，不进行隐式迁移。Baseline 与 Report 只存在于内存中的显式调用结果，
+本模块不自动持久化或扫描历史数据。
+
+`python -m embedded_copilot.benchmark.run` 是预留 CLI 边界，当前固定返回状态码 2，
+不提供 Dataset I/O。该评估层不使用 LLM judge，不访问网络，不生成训练数据，不执行模型优化，
+也不构成真实构建、设备或硬件验证。
 
 ## Current Runtime Scope
 
