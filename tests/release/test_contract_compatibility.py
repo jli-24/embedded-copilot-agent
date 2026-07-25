@@ -107,5 +107,5 @@ def test_health_contract_changes_only_version_literal() -> None:
     assert tuple(schema["properties"]) == ("status", "version", "mode")
     assert tuple(schema["required"]) == ("status", "mode")
     assert schema["additionalProperties"] is False
-    assert schema["properties"]["version"]["const"] == "0.20.0"
-    assert schema["properties"]["version"]["default"] == "0.20.0"
+    assert schema["properties"]["version"]["const"] == "0.23.0-alpha1"
+    assert schema["properties"]["version"]["default"] == "0.23.0-alpha1"
