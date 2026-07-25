@@ -1,0 +1,1 @@
+"""Copilot Workspace contract tests."""
