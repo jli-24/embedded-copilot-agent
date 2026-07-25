@@ -46,8 +46,49 @@ class RuntimeComponents:
 
 
 def build_analysis_service(settings: Settings) -> AnalysisService:
+    from embedded_copilot.datasheet.extensions.real_pdf.parser import (
+        RealPDFDatasheetParser,
+    )
+    from embedded_copilot.debug.agent import DebugAgent as FoundationDebugAgent
+    from embedded_copilot.engineering.adapter import (
+        EngineeringSupervisorAdapter,
+        RealEngineeringInputAdapter,
+    )
+    from embedded_copilot.engineering.agent_adapters import (
+        ExtensionMetadataSanitizingAgentAdapter,
+        FirmwareAgentInputAdapter,
+        HardwareAgentInputAdapter,
+    )
+    from embedded_copilot.engineering.config import (
+        EngineeringExtensionSettings,
+        real_pdf_backend_available,
+    )
+    from embedded_copilot.engineering.resolver import TrustedEngineeringResolver
+    from embedded_copilot.firmware.agent import FirmwareAgent as FoundationFirmwareAgent
+    from embedded_copilot.hardware.agent import HardwareAgent
+    from embedded_copilot.pcb.agent import PCBAgent
+
+    extension = EngineeringExtensionSettings.from_environment()
+    supervisor: object = SupervisorAgent()
+    if extension.input_root is not None and real_pdf_backend_available():
+        supervisor = EngineeringSupervisorAdapter(
+            delegate=SupervisorAgent(
+                agents=(
+                    FirmwareAgentInputAdapter(FoundationFirmwareAgent()),
+                    HardwareAgentInputAdapter(HardwareAgent()),
+                    ExtensionMetadataSanitizingAgentAdapter(PCBAgent()),
+                    ExtensionMetadataSanitizingAgentAdapter(
+                        FoundationDebugAgent()
+                    ),
+                )
+            ),
+            input_adapter=RealEngineeringInputAdapter(
+                resolver=TrustedEngineeringResolver(extension.input_root),
+                pdf_parser=RealPDFDatasheetParser(),
+            ),
+        )
     return AnalysisService(
-        supervisor=SupervisorAgent(),
+        supervisor=supervisor,
         registry=ExecutionRegistry(capacity=settings.analysis_registry_capacity),
         timeout_seconds=settings.analysis_timeout_seconds,
     )
