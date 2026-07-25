@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import copy
 from pathlib import PurePath
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from embedded_copilot.knowledge.models import (
     KnowledgeQuery,
     KnowledgeResult,
     KnowledgeSource,
 )
-from embedded_copilot.rag.retriever import RetrievedChunk
+
+if TYPE_CHECKING:
+    from embedded_copilot.rag.retriever import RetrievedChunk
 
 
 class KnowledgeCandidateRetriever(Protocol):
