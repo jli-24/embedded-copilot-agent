@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
+
+from embedded_copilot.intelligence._validation import safe_identifier
+from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
+from embedded_copilot.intelligence.providers.base import ModelProvider
+from embedded_copilot.schemas.model import ModelTaskType
+
+
+def validate_providers(
+    providers: Sequence[ModelProvider],
+) -> tuple[ModelProvider, ...]:
+    validated: list[ModelProvider] = []
+    identifiers: set[str] = set()
+    for provider in providers:
+        try:
+            provider_id = safe_identifier(provider.provider_id, field="provider_id")
+            tasks = provider.supported_tasks
+            generate = provider.generate
+        except Exception as exc:
+            raise ValueError("model provider configuration is invalid") from exc
+        if (
+            not isinstance(tasks, tuple)
+            or not tasks
+            or any(not isinstance(task, ModelTaskType) for task in tasks)
+            or len(set(tasks)) != len(tasks)
+            or not callable(generate)
+            or provider_id.casefold() in identifiers
+        ):
+            raise ValueError("model provider configuration is invalid")
+        identifiers.add(provider_id.casefold())
+        validated.append(provider)
+    return tuple(validated)
+
+
+def select_provider(
+    providers: Sequence[ModelProvider],
+    task: ModelTaskType,
+) -> ModelProvider:
+    for provider in providers:
+        if task in provider.supported_tasks:
+            return provider
+    raise ModelProviderUnavailable("model provider is unavailable")

@@ -10,6 +10,11 @@ from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from embedded_copilot.hardware_design.approval import DesignApprovalStatus
 from embedded_copilot.hardware_design.decision import DesignDecisionStatus
+from embedded_copilot.schemas.model import (
+    ModelInputType as ModelInputType,
+    ModelRequest as ModelRequest,
+    ModelTaskType as ModelTaskType,
+)
 from embedded_copilot.schemas.result import ContractModel
 
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:#-]{0,159}$")
@@ -73,19 +78,6 @@ class ChatRole(StrEnum):
     USER = "USER"
     ASSISTANT = "ASSISTANT"
     SYSTEM = "SYSTEM"
-
-
-class ModelTaskType(StrEnum):
-    CHAT = "CHAT"
-    VISION = "VISION"
-    CODE = "CODE"
-    REASONING = "REASONING"
-
-
-class ModelInputType(StrEnum):
-    TEXT = "TEXT"
-    IMAGE = "IMAGE"
-    FILE = "FILE"
 
 
 class ApprovalAction(StrEnum):
@@ -201,17 +193,6 @@ def utc_datetime(value: object, *, field: str) -> datetime:
     if value.tzinfo is None or value.utcoffset() != timedelta(0):
         raise ValueError(f"{field} must use UTC")
     return value
-
-
-class ModelRequest(CopilotContractModel):
-    task_type: ModelTaskType
-    input_type: ModelInputType
-    context_ids: tuple[str, ...] = Field(min_length=1)
-
-    @field_validator("context_ids", mode="before")
-    @classmethod
-    def validate_context_ids(cls, value: object) -> object:
-        return identifier_tuple(value, field="context_id")
 
 
 class ArtifactEvidenceView(CopilotContractModel):
