@@ -11,15 +11,25 @@ from embedded_copilot.knowledge.models import (
     KnowledgeResult,
     KnowledgeSource,
 )
+from embedded_copilot.knowledge.manager import KnowledgeManager
 from embedded_copilot.knowledge.providers import KnowledgeProvider
+from embedded_copilot.knowledge.source import (
+    KnowledgeEvidence,
+    KnowledgeRetrieval,
+    KnowledgeSourceType,
+)
 
 __all__ = [
     "DocumentMetadata",
     "KnowledgeQuery",
     "KnowledgeGatewayError",
+    "KnowledgeEvidence",
+    "KnowledgeManager",
     "KnowledgeProvider",
     "KnowledgeProviderError",
     "KnowledgeResult",
+    "KnowledgeRetrieval",
     "KnowledgeRetriever",
     "KnowledgeSource",
+    "KnowledgeSourceType",
 ]

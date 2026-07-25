@@ -15,6 +15,9 @@ from embedded_copilot.schemas.model import (
     ModelRequest as ModelRequest,
     ModelTaskType as ModelTaskType,
 )
+from embedded_copilot.schemas.knowledge_trace import (
+    KnowledgeTraceAction as KnowledgeTraceAction,
+)
 from embedded_copilot.schemas.result import ContractModel
 
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:#-]{0,159}$")
@@ -84,12 +87,6 @@ class ApprovalAction(StrEnum):
     APPROVE = "APPROVE"
     REJECT = "REJECT"
     REQUEST_MODIFICATION = "REQUEST_MODIFICATION"
-
-
-class KnowledgeTraceAction(StrEnum):
-    VIEWED = "VIEWED"
-    USED = "USED"
-    SAVED = "SAVED"
 
 
 class WorkspaceFileType(StrEnum):

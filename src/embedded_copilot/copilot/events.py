@@ -2,18 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import field_validator
 
 from embedded_copilot.copilot.models import (
     ApprovalAction,
     CopilotContractModel,
-    KnowledgeTraceAction,
-    identifier_tuple,
     safe_identifier,
     safe_optional_summary,
-    safe_summary,
     utc_datetime,
 )
+from embedded_copilot.schemas.knowledge_trace import KnowledgeTrace as KnowledgeTrace
 
 
 class ApprovalEvent(CopilotContractModel):
@@ -36,30 +34,3 @@ class ApprovalEvent(CopilotContractModel):
     @classmethod
     def validate_timestamp(cls, value: object) -> datetime:
         return utc_datetime(value, field="timestamp")
-
-
-class KnowledgeTrace(CopilotContractModel):
-    query: str
-    source_ids: tuple[str, ...] = ()
-    result_count: int = Field(ge=0)
-    action: KnowledgeTraceAction
-
-    @field_validator("query", mode="before")
-    @classmethod
-    def validate_query(cls, value: object) -> str:
-        return safe_summary(value, field="query")
-
-    @field_validator("source_ids", mode="before")
-    @classmethod
-    def validate_source_ids(cls, value: object) -> object:
-        return identifier_tuple(value, field="source_id")
-
-    @model_validator(mode="after")
-    def validate_result_binding(self) -> "KnowledgeTrace":
-        if bool(self.source_ids) != bool(self.result_count):
-            raise ValueError(
-                "result count and source IDs must both be empty or populated"
-            )
-        if self.result_count < len(self.source_ids):
-            raise ValueError("result count cannot be lower than unique source count")
-        return self
