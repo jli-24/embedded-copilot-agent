@@ -1,4 +1,28 @@
-# Embedded Copilot Agent v0.18 Architecture
+# Embedded Copilot Agent v0.19 Architecture
+
+## v0.19 Productization Flow
+
+```text
+Streamlit metadata builder / Demo manifest
+  -> JSON metadata only
+  -> FastAPI /api/v1/analyze
+  -> AnalysisService
+  -> attach_input_context()
+  -> SupervisorAgent
+  -> EngineeringReport
+  -> in-memory ExecutionRegistry
+  -> status/report API
+  -> EngineeringReport viewer
+```
+
+API Layer 不导入领域 Agent 实现。Streamlit 不导入 Supervisor、Agent、Parser、
+Knowledge Gateway 或旧 `multimodal/`。只有 `AnalysisService` 构造 `AgentTask`、通过
+Supervisor adapter 注入 `UnifiedInputContext` 并调用 Supervisor。Registry 只保存状态、
+安全错误或 `EngineeringReport`，单 worker、容量 100、默认超时 120 秒，进程重启后清空。
+
+附件内容不会上传、读取、持久化、解析、缓存或索引。Demo fixture 只由 manifest 描述；
+UI 和分析链不读取 fixture 正文。报告 viewer 只显示已有 evidence、recommendation 与
+trace，不调用 LLM，也不序列化 PCB/Datasheet model。
 
 ## v0.18 Embedded Copilot Integration Flow
 

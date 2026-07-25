@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.18.0 是面向嵌入式开发者的 Foundation Agent
+Embedded Copilot Agent v0.19.0 是面向嵌入式开发者的 Foundation Agent
 System。它使用 LangGraph 将请求显式路由到 Knowledge、Firmware 或 Debug
 Agent，并通过 typed Tool、RAG 与 FastAPI 返回结构化结果。
 
@@ -48,12 +48,49 @@ python -m compileall src
 .\\.venv\\Scripts\\python.exe -m uvicorn embedded_copilot.api.main:app --host 127.0.0.1 --port 8000
 ```
 
+另一个终端启动产品演示界面：
+
+```powershell
+.\\.venv\\Scripts\\python.exe -m streamlit run web/app.py --server.port 8501
+```
+
+浏览器访问 `http://127.0.0.1:8501`。Streamlit 通过
+`EMBEDDED_COPILOT_API_URL` 连接 FastAPI，默认值为 `http://127.0.0.1:8000`。
+
 接口：
 
 - `GET /api/v1/health`
 - `POST /api/v1/chat`
+- `POST /api/v1/analyze`
+- `GET /api/v1/status/{execution_id}`
+- `GET /api/v1/report/{execution_id}`
 - `GET /health`，兼容别名
 - `POST /chat`，兼容别名
+
+## Product Demo
+
+v0.19.0 增加 metadata-only 产品入口。`POST /api/v1/analyze` 只接收需求文本、
+`UserAttachment` 元信息与可选 Agent 列表，返回进程内 `execution_id`；执行状态按
+`queued -> running -> completed | failed` 转换。`AnalysisService` 是 API 与同步
+Supervisor workflow 的唯一桥梁，最终跨 API 返回的分析结果只有 `EngineeringReport`。
+
+`ExecutionRegistry` 默认最多保存 100 条状态或报告，不保存 request 原文、附件元信息、
+`AgentResult`、PCB/Datasheet model 或文件内容。服务必须使用单个 API worker；重启会丢失
+执行记录。默认分析超时为 120 秒，超时不会被解释为底层同步线程已被强制终止。
+
+Streamlit 不导入 Supervisor、Agent、Parser 或 Knowledge Gateway。上传控件只读取
+filename、MIME 与 size，不调用上传对象的内容读取接口。`demo/esp32_camera/manifest.json`
+描述合成 ESP32 Camera 示例；“Load Demo”只加载 manifest 中的需求和附件元信息，四个
+fixture 的内容不会进入分析流程。缺少内容证据的领域允许安全失败，UI 不补写结论。
+
+Docker 使用一个 image 和两个 Compose service：
+
+```powershell
+docker compose up --build
+```
+
+FastAPI 暴露在 `8000`，Streamlit 暴露在 `8501`。Compose 固定 FastAPI 为一个 worker，
+不包含认证、数据库、Redis、Celery 或其他消息队列。
 
 请求示例：
 

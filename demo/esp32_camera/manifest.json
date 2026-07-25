@@ -1,0 +1,40 @@
+{
+  "id": "synthetic-esp32-camera-product-demo",
+  "name": "Synthetic ESP32 Camera Engineering Review",
+  "request": "Review an ESP32-S3 camera design across hardware interfaces, firmware structure, PCB constraints, and a synthetic build failure.",
+  "attachments": [
+    {
+      "id": "demo-datasheet",
+      "filename": "esp32_camera_datasheet.pdf",
+      "media_type": "document",
+      "content_type": "application/pdf",
+      "size_bytes": 384,
+      "metadata": {"category": "document", "format": "pdf"}
+    },
+    {
+      "id": "demo-pcb",
+      "filename": "esp32_camera.kicad_pcb",
+      "media_type": "eda",
+      "content_type": "application/x-kicad-pcb",
+      "size_bytes": 512,
+      "metadata": {"category": "eda", "format": "kicad_pcb"}
+    },
+    {
+      "id": "demo-source",
+      "filename": "camera_firmware.c",
+      "media_type": "source_code",
+      "content_type": "text/x-c",
+      "size_bytes": 256,
+      "metadata": {"category": "source_code", "format": "c"}
+    },
+    {
+      "id": "demo-log",
+      "filename": "camera_build.log",
+      "media_type": "log",
+      "content_type": "text/plain",
+      "size_bytes": 192,
+      "metadata": {"category": "log", "format": "log"}
+    }
+  ],
+  "required_agents": ["hardware", "firmware", "pcb", "debug"]
+}

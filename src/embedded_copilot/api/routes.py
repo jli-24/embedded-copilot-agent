@@ -5,16 +5,37 @@ from typing import Protocol
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
+from embedded_copilot.api.models import AnalyzeRequest, AnalyzeResponse
+from embedded_copilot.integration.report import EngineeringReport
 from embedded_copilot.schemas.api import ChatRequest, ChatResponse, HealthResponse
 from embedded_copilot.schemas.result import ErrorCode
+from embedded_copilot.services.analysis import AnalysisCommand
+from embedded_copilot.services.execution import (
+    ExecutionCapacityError,
+    ExecutionNotFoundError,
+    ExecutionSnapshot,
+    ReportNotReadyError,
+)
 
 
 class ChatService(Protocol):
     async def chat(self, message: str, *, trace_id: str) -> ChatResponse: ...
 
 
+class ProductAnalysisService(Protocol):
+    async def submit(self, command: AnalysisCommand) -> ExecutionSnapshot: ...
+
+    def get_status(self, execution_id: str) -> ExecutionSnapshot: ...
+
+    def get_report(self, execution_id: str) -> EngineeringReport: ...
+
+
 def get_chat_service(request: Request) -> ChatService:
     return request.app.state.copilot_service
+
+
+def get_analysis_service(request: Request) -> ProductAnalysisService:
+    return request.app.state.analysis_service
 
 
 def _error_status(error_code: ErrorCode) -> int:
@@ -29,6 +50,67 @@ def _error_status(error_code: ErrorCode) -> int:
 
 
 router = APIRouter()
+
+
+@router.post(
+    "/api/v1/analyze",
+    response_model=AnalyzeResponse,
+    status_code=202,
+)
+async def analyze(
+    payload: AnalyzeRequest,
+    service: ProductAnalysisService = Depends(get_analysis_service),
+) -> AnalyzeResponse | JSONResponse:
+    try:
+        snapshot = await service.submit(payload.to_command())
+    except ExecutionCapacityError:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Analysis capacity is full."},
+        )
+    return AnalyzeResponse(
+        execution_id=snapshot.execution_id,
+        status=snapshot.status,
+    )
+
+
+@router.get(
+    "/api/v1/status/{execution_id}",
+    response_model=ExecutionSnapshot,
+)
+async def analysis_status(
+    execution_id: str,
+    service: ProductAnalysisService = Depends(get_analysis_service),
+) -> ExecutionSnapshot | JSONResponse:
+    try:
+        return service.get_status(execution_id)
+    except ExecutionNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Analysis execution was not found."},
+        )
+
+
+@router.get(
+    "/api/v1/report/{execution_id}",
+    response_model=EngineeringReport,
+)
+async def analysis_report(
+    execution_id: str,
+    service: ProductAnalysisService = Depends(get_analysis_service),
+) -> EngineeringReport | JSONResponse:
+    try:
+        return service.get_report(execution_id)
+    except ExecutionNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Analysis execution was not found."},
+        )
+    except ReportNotReadyError:
+        return JSONResponse(
+            status_code=409,
+            content={"detail": "Analysis report is not ready."},
+        )
 
 
 @router.post("/api/v1/chat", response_model=ChatResponse)

@@ -11,11 +11,11 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from embedded_copilot.api.dependencies import build_runtime
-from embedded_copilot.api.routes import ChatService, router
+from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
+from embedded_copilot.services.runtime import build_analysis_service, build_runtime
 
 
 logger = logging.getLogger(__name__)
@@ -40,6 +40,7 @@ def create_app(
     *,
     settings: Settings | None = None,
     service: ChatService | None = None,
+    analysis_service: ProductAnalysisService | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
 
@@ -54,7 +55,13 @@ def create_app(
             application.state.copilot_service = runtime.service
             application.state.health_status = runtime.health_status
             application.state.ingestion_errors = runtime.ingestion_errors
-        yield
+        active_analysis = analysis_service or build_analysis_service(active_settings)
+        application.state.analysis_service = active_analysis
+        await active_analysis.start()
+        try:
+            yield
+        finally:
+            await active_analysis.close()
 
     application = FastAPI(
         title=active_settings.app_name,

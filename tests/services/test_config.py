@@ -12,8 +12,8 @@ from embedded_copilot.services.config import Settings
 def test_settings_have_v0180_offline_defaults() -> None:
     settings = Settings(_env_file=None)
 
-    assert __version__ == "0.18.0"
-    assert settings.version == "0.18.0"
+    assert __version__ == "0.19.0"
+    assert settings.version == "0.19.0"
     assert settings.runtime_mode == "offline"
     assert settings.chunk_size == 800
     assert settings.chunk_overlap == 100

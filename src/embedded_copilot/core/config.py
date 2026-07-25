@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Embedded Copilot Agent"
-    version: Literal["0.18.0"] = "0.18.0"
+    version: Literal["0.19.0"] = "0.19.0"
     environment: str = "development"
     debug: bool = False
     llm_provider: str | None = None
@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     retrieval_top_k: int = Field(default=4, ge=1, le=20)
     retrieval_score_threshold: float = Field(default=0.15, ge=0.0, le=1.0)
     request_timeout_seconds: float = Field(default=10.0, gt=0.0, le=120.0)
+    analysis_timeout_seconds: float = Field(default=120.0, gt=0.0, le=600.0)
+    analysis_registry_capacity: int = Field(default=100, ge=1, le=10_000)
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":
