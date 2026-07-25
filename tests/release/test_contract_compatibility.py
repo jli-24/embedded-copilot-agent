@@ -87,10 +87,7 @@ def test_benchmark_public_model_contract_shapes_remain_compatible() -> None:
 
 def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
     paths = app.openapi()["paths"]
-    assert {
-        path: tuple(methods)
-        for path, methods in paths.items()
-    } == {
+    assert {path: tuple(methods) for path, methods in paths.items()} == {
         "/api/v1/analyze": ("post",),
         "/api/v1/status/{execution_id}": ("get",),
         "/api/v1/report/{execution_id}": ("get",),
@@ -99,6 +96,11 @@ def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
         "/api/v1/copilot/sessions": ("post",),
         "/api/v1/copilot/sessions/{session_id}": ("get",),
         "/api/v1/copilot/sessions/{session_id}/messages": ("post",),
+        "/api/v1/copilot/sessions/{session_id}/workspace": ("get",),
+        "/api/v1/copilot/sessions/{session_id}/artifact-view": ("get",),
+        "/api/v1/copilot/sessions/{session_id}/files": ("get",),
+        "/api/v1/copilot/sessions/{session_id}/progress": ("get",),
+        "/api/v1/copilot/sessions/{session_id}/review": ("post",),
     }
 
 

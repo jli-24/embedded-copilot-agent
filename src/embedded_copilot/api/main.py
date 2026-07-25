@@ -15,13 +15,25 @@ from embedded_copilot.api.copilot_routes import (
     WorkspaceService,
     router as copilot_router,
 )
+from embedded_copilot.api.experience_routes import (
+    ExperienceService,
+    router as experience_router,
+)
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
+from embedded_copilot.services.experience_runtime import build_experience_runtime
 from embedded_copilot.services.runtime import build_analysis_service, build_runtime
 
 logger = logging.getLogger(__name__)
+
+
+class _UnsetService:
+    pass
+
+
+_UNSET_SERVICE = _UnsetService()
 
 
 def _error_response(
@@ -46,14 +58,32 @@ def create_app(
     settings: Settings | None = None,
     service: ChatService | None = None,
     analysis_service: ProductAnalysisService | None = None,
-    workspace_service: WorkspaceService | None = None,
+    workspace_service: WorkspaceService | None | _UnsetService = _UNSET_SERVICE,
+    experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
 ) -> FastAPI:
     active_settings = settings or Settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+        default_experience_runtime = None
+        if isinstance(workspace_service, _UnsetService):
+            default_experience_runtime = build_experience_runtime()
+            active_workspace_service: WorkspaceService | None = (
+                default_experience_runtime.workspace_service
+            )
+        else:
+            active_workspace_service = workspace_service
+        if isinstance(experience_service, _UnsetService):
+            active_experience_service: ExperienceService | None = (
+                default_experience_runtime.experience_service
+                if default_experience_runtime is not None
+                else None
+            )
+        else:
+            active_experience_service = experience_service
         application.state.settings = active_settings
-        application.state.workspace_service = workspace_service
+        application.state.workspace_service = active_workspace_service
+        application.state.experience_service = active_experience_service
         if service is not None:
             application.state.copilot_service = service
             application.state.health_status = "ok"
@@ -122,6 +152,7 @@ def create_app(
 
     application.include_router(router)
     application.include_router(copilot_router)
+    application.include_router(experience_router)
     return application
 
 
