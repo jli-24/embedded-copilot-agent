@@ -11,12 +11,15 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from embedded_copilot.api.copilot_routes import (
+    WorkspaceService,
+    router as copilot_router,
+)
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
 from embedded_copilot.services.runtime import build_analysis_service, build_runtime
-
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +36,9 @@ def _error_response(
         trace_id=trace_id,
         error=ErrorDetail(code=code, message=message, retryable=False),
     )
-    return JSONResponse(status_code=status_code, content=response.model_dump(mode="json"))
+    return JSONResponse(
+        status_code=status_code, content=response.model_dump(mode="json")
+    )
 
 
 def create_app(
@@ -41,12 +46,14 @@ def create_app(
     settings: Settings | None = None,
     service: ChatService | None = None,
     analysis_service: ProductAnalysisService | None = None,
+    workspace_service: WorkspaceService | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.settings = active_settings
+        application.state.workspace_service = workspace_service
         if service is not None:
             application.state.copilot_service = service
             application.state.health_status = "ok"
@@ -81,6 +88,14 @@ def create_app(
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
+        if request.url.path.startswith("/api/v1/copilot/"):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "detail": "Request validation failed.",
+                    "trace_id": request.state.trace_id,
+                },
+            )
         return _error_response(
             trace_id=request.state.trace_id,
             code=ErrorCode.VALIDATION_ERROR,
@@ -106,6 +121,7 @@ def create_app(
         )
 
     application.include_router(router)
+    application.include_router(copilot_router)
     return application
 
 
