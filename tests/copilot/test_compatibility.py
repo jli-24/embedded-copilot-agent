@@ -91,12 +91,15 @@ def test_copilot_package_exports_only_workspace_contract_operations() -> None:
         assert not hasattr(copilot, forbidden)
 
 
-def test_no_existing_runtime_component_depends_on_workspace() -> None:
+def test_only_conversation_adapter_may_depend_on_workspace() -> None:
     package_root = Path(__file__).parents[2] / "src" / "embedded_copilot"
     consumers = tuple(
         path
         for path in package_root.rglob("*.py")
-        if "copilot" not in path.relative_to(package_root).parts
+        if not {
+            "copilot",
+            "conversation",
+        }.intersection(path.relative_to(package_root).parts)
     )
 
     assert consumers
