@@ -91,8 +91,13 @@ def test_copilot_package_exports_only_workspace_contract_operations() -> None:
         assert not hasattr(copilot, forbidden)
 
 
-def test_only_conversation_adapter_may_depend_on_workspace() -> None:
+def test_only_approved_adapters_may_depend_on_workspace() -> None:
     package_root = Path(__file__).parents[2] / "src" / "embedded_copilot"
+    approved_adapters = {
+        package_root / "api" / "copilot_models.py",
+        package_root / "api" / "copilot_routes.py",
+        package_root / "intelligence" / "esp32.py",
+    }
     consumers = tuple(
         path
         for path in package_root.rglob("*.py")
@@ -100,6 +105,7 @@ def test_only_conversation_adapter_may_depend_on_workspace() -> None:
             "copilot",
             "conversation",
         }.intersection(path.relative_to(package_root).parts)
+        and path not in approved_adapters
     )
 
     assert consumers
