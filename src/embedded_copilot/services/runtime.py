@@ -66,20 +66,30 @@ def build_analysis_service(settings: Settings) -> AnalysisService:
     from embedded_copilot.engineering.resolver import TrustedEngineeringResolver
     from embedded_copilot.firmware.agent import FirmwareAgent as FoundationFirmwareAgent
     from embedded_copilot.hardware.agent import HardwareAgent
+    from embedded_copilot.hardware_design.adapter import (
+        HardwareBlueprintProjectionAgentAdapter,
+    )
     from embedded_copilot.pcb.agent import PCBAgent
 
     extension = EngineeringExtensionSettings.from_environment()
-    supervisor: object = SupervisorAgent()
+    supervisor: object = SupervisorAgent(
+        agents=(
+            FoundationFirmwareAgent(),
+            HardwareBlueprintProjectionAgentAdapter(HardwareAgent()),
+            PCBAgent(),
+            FoundationDebugAgent(),
+        )
+    )
     if extension.input_root is not None and real_pdf_backend_available():
         supervisor = EngineeringSupervisorAdapter(
             delegate=SupervisorAgent(
                 agents=(
                     FirmwareAgentInputAdapter(FoundationFirmwareAgent()),
-                    HardwareAgentInputAdapter(HardwareAgent()),
-                    ExtensionMetadataSanitizingAgentAdapter(PCBAgent()),
-                    ExtensionMetadataSanitizingAgentAdapter(
-                        FoundationDebugAgent()
+                    HardwareBlueprintProjectionAgentAdapter(
+                        HardwareAgentInputAdapter(HardwareAgent())
                     ),
+                    ExtensionMetadataSanitizingAgentAdapter(PCBAgent()),
+                    ExtensionMetadataSanitizingAgentAdapter(FoundationDebugAgent()),
                 )
             ),
             input_adapter=RealEngineeringInputAdapter(

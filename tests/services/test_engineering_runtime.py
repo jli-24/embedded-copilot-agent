@@ -8,11 +8,16 @@ import fitz
 from embedded_copilot import __version__
 from embedded_copilot.engineering import config as engineering_config
 from embedded_copilot.engineering.adapter import EngineeringSupervisorAdapter
+from embedded_copilot.engineering.agent_adapters import HardwareAgentInputAdapter
 from embedded_copilot.engineering.config import EngineeringExtensionSettings
 from embedded_copilot.input.models import (
     AttachmentType,
     UnifiedInputContext,
     UserAttachment,
+)
+from embedded_copilot.hardware.agent import HardwareAgent
+from embedded_copilot.hardware_design.adapter import (
+    HardwareBlueprintProjectionAgentAdapter,
 )
 from embedded_copilot.services.analysis import AnalysisCommand
 from embedded_copilot.services.config import Settings
@@ -38,6 +43,9 @@ def test_runtime_uses_legacy_supervisor_without_extension_root(monkeypatch) -> N
 
     assert isinstance(service._supervisor, SupervisorAgent)
     assert not isinstance(service._supervisor, EngineeringSupervisorAdapter)
+    hardware = service._supervisor._dispatcher.get_agent("HardwareAgent")
+    assert isinstance(hardware, HardwareBlueprintProjectionAgentAdapter)
+    assert isinstance(hardware._delegate, HardwareAgent)
 
 
 def test_runtime_composes_transparent_extension_when_root_is_configured(
@@ -50,6 +58,10 @@ def test_runtime_composes_transparent_extension_when_root_is_configured(
 
     assert isinstance(service._supervisor, EngineeringSupervisorAdapter)
     assert isinstance(service._supervisor._delegate, SupervisorAgent)
+    hardware = service._supervisor._delegate._dispatcher.get_agent("HardwareAgent")
+    assert isinstance(hardware, HardwareBlueprintProjectionAgentAdapter)
+    assert isinstance(hardware._delegate, HardwareAgentInputAdapter)
+    assert isinstance(hardware._delegate._delegate, HardwareAgent)
 
 
 def test_runtime_keeps_legacy_composition_when_optional_backend_is_missing(
@@ -102,10 +114,16 @@ def test_runtime_extension_produces_firmware_report_without_raw_source(
             snapshot = await service.submit(command)
             for _ in range(100):
                 current = service.get_status(snapshot.execution_id)
-                if current.status in {ExecutionStatus.COMPLETED, ExecutionStatus.FAILED}:
+                if current.status in {
+                    ExecutionStatus.COMPLETED,
+                    ExecutionStatus.FAILED,
+                }:
                     break
                 await asyncio.sleep(0.005)
-            assert service.get_status(snapshot.execution_id).status is ExecutionStatus.COMPLETED
+            assert (
+                service.get_status(snapshot.execution_id).status
+                is ExecutionStatus.COMPLETED
+            )
             report = service.get_report(snapshot.execution_id)
             assert report.firmware_section is not None
             assert any(
@@ -196,7 +214,10 @@ Pin No. Pin Name Function
                 if status in {ExecutionStatus.COMPLETED, ExecutionStatus.FAILED}:
                     break
                 await asyncio.sleep(0.005)
-            assert service.get_status(snapshot.execution_id).status is ExecutionStatus.COMPLETED
+            assert (
+                service.get_status(snapshot.execution_id).status
+                is ExecutionStatus.COMPLETED
+            )
             report = service.get_report(snapshot.execution_id)
             assert report.firmware_section is not None
             assert report.hardware_section is not None
