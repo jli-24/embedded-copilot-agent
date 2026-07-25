@@ -12,6 +12,7 @@ def test_streamlit_layer_does_not_import_runtime_implementation_modules() -> Non
         "embedded_copilot.datasheet",
         "embedded_copilot.knowledge",
         "embedded_copilot.multimodal",
+        "embedded_copilot.evaluation.runner",
     )
     violations: list[str] = []
     for path in Path("web").glob("*.py"):
@@ -25,3 +26,11 @@ def test_streamlit_layer_does_not_import_runtime_implementation_modules() -> Non
             violations.append(path.name)
 
     assert violations == []
+
+
+def test_streamlit_app_uses_product_api_as_its_only_analysis_boundary() -> None:
+    source = Path("web/app.py").read_text(encoding="utf-8")
+
+    assert "ProductApiClient" in source
+    assert "EvaluationRunner" not in source
+    assert ".run(" not in source

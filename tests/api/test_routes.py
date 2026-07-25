@@ -98,7 +98,7 @@ def test_chat_paths_return_stable_envelope(path: str) -> None:
 
 
 @pytest.mark.parametrize("path", ["/api/v1/health", "/health"])
-def test_health_paths_report_v0190(path: str) -> None:
+def test_health_paths_report_v0200(path: str) -> None:
     response = asyncio.run(
         _request(FakeCopilotService(), "GET", path)
     )
@@ -106,7 +106,7 @@ def test_health_paths_report_v0190(path: str) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.19.0",
+        "version": "0.20.0",
         "mode": "offline",
     }
 

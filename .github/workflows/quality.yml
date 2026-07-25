@@ -1,0 +1,30 @@
+name: Quality
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install --no-deps -e ".[dev]"
+      - name: Verify public schemas
+        run: pytest tests/release/test_contract_compatibility.py -q
+      - name: Run test suite
+        run: pytest -q
+      - name: Compile Python sources
+        run: python -m compileall -q src tests
+      - name: Run Ruff
+        run: ruff check .
