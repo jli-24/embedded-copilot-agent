@@ -15,10 +15,10 @@ from embedded_copilot.file_runtime import FileExtractionPort
 
 class _ExtractionPort:
     async def extract(self, request, extractor, *, result_type):
-        raise AssertionError("foundation runtime must not read a file")
+        raise RuntimeError(r"C:\private\datasheet.pdf must not leak")
 
 
-def test_factory_returns_isolated_runtime_with_safe_unavailable_port() -> None:
+def test_factory_maps_unexpected_extraction_failure_without_leaks() -> None:
     source_port: FileExtractionPort = _ExtractionPort()
     runtime = create_datasheet_runtime(source_port)
 
@@ -35,6 +35,7 @@ def test_factory_returns_isolated_runtime_with_safe_unavailable_port() -> None:
         )
 
     assert str(raised.value) == "datasheet_unavailable"
+    assert "private" not in str(raised.value)
     for forbidden in (
         "file_port",
         "extraction_port",

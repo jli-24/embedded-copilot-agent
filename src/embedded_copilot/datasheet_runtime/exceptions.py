@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from embedded_copilot.file_runtime import FileRuntimeError
 
-class DatasheetRuntimeError(RuntimeError):
+
+class DatasheetRuntimeError(FileRuntimeError):
     """A safe datasheet-runtime failure without document details."""
 
     error_code = "datasheet_unavailable"
 
     def __init__(self) -> None:
-        super().__init__(self.error_code)
+        super().__init__()
 
     def __repr__(self) -> str:
         return f"{type(self).__name__}()"

@@ -1,0 +1,1 @@
+"""Internal PDF structure parsing."""
