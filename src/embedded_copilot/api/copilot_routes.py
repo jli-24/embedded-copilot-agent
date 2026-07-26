@@ -5,10 +5,13 @@ from typing import Protocol
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from embedded_copilot.api.copilot_models import (
     CopilotAttachmentReceipt,
     CopilotAttachmentRequest,
+    CopilotDatasheetRequest,
+    CopilotDatasheetResponse,
     CopilotFileIntelligenceRequest,
     CopilotFileIntelligenceResponse,
     CopilotMessageRequest,
@@ -23,6 +26,13 @@ from embedded_copilot.conversation.repository import (
     ConversationStateConflict,
 )
 from embedded_copilot.copilot.workspace import ProjectWorkspace
+from embedded_copilot.datasheet_runtime import (
+    DatasheetAnalysisTimeout,
+    DatasheetDocumentRejected,
+    DatasheetIntelligencePort,
+    DatasheetRequest,
+    DatasheetRuntimeUnavailable,
+)
 from embedded_copilot.file_runtime import (
     FileAnalysisTimeout,
     FileIntelligencePort,
@@ -101,6 +111,10 @@ def get_file_port(request: Request) -> FileIntelligencePort | None:
     return request.app.state.file_port
 
 
+def get_datasheet_port(request: Request) -> DatasheetIntelligencePort | None:
+    return request.app.state.datasheet_port
+
+
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -169,6 +183,36 @@ def _map_file_error(request: Request, error: Exception) -> JSONResponse:
         return _file_error(request, status_code=503)
     if isinstance(error, FileAnalysisTimeout):
         return _file_error(request, status_code=504)
+    raise error
+
+
+def _datasheet_error(request: Request, *, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": "datasheet_unavailable",
+            "trace_id": request.state.trace_id,
+        },
+    )
+
+
+def _map_datasheet_error(request: Request, error: Exception) -> JSONResponse:
+    if isinstance(error, FileReferenceNotFound):
+        return _datasheet_error(request, status_code=404)
+    if isinstance(error, FileReferenceConflict):
+        return _datasheet_error(request, status_code=409)
+    if isinstance(error, (DatasheetDocumentRejected, ValidationError)):
+        return _datasheet_error(request, status_code=422)
+    if isinstance(
+        error,
+        (DatasheetRuntimeUnavailable, FileRuntimeUnavailable),
+    ):
+        return _datasheet_error(request, status_code=503)
+    if isinstance(
+        error,
+        (DatasheetAnalysisTimeout, FileAnalysisTimeout),
+    ):
+        return _datasheet_error(request, status_code=504)
     raise error
 
 
@@ -354,3 +398,32 @@ async def analyze_copilot_file(
         )
     except Exception as error:
         return _map_file_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/datasheets/analyze",
+    response_model=CopilotDatasheetResponse,
+)
+async def analyze_copilot_datasheet(
+    session_id: str,
+    payload: CopilotDatasheetRequest,
+    request: Request,
+    port: DatasheetIntelligencePort | None = Depends(get_datasheet_port),
+) -> CopilotDatasheetResponse | JSONResponse:
+    if port is None:
+        return _datasheet_error(request, status_code=503)
+    try:
+        suggestion = await port.analyze(
+            DatasheetRequest(
+                session_id=session_id,
+                file_id=payload.file_id,
+                instruction_summary=payload.instruction_summary,
+            )
+        )
+        return CopilotDatasheetResponse(
+            type=suggestion.output_type,
+            summary=suggestion.summary,
+            review_required=suggestion.review_required,
+        )
+    except Exception as error:
+        return _map_datasheet_error(request, error)

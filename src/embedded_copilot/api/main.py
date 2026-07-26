@@ -24,6 +24,10 @@ from embedded_copilot.api.file_reference_catalog import (
     CopilotFileReferenceCatalog,
 )
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
+from embedded_copilot.datasheet_runtime import (
+    DatasheetIntelligencePort,
+    create_datasheet_runtime,
+)
 from embedded_copilot.file_runtime import (
     FileIntelligencePort,
     create_file_runtime,
@@ -75,6 +79,7 @@ def create_app(
     experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
     vision_port: VisionPort | None | _UnsetService = _UNSET_SERVICE,
     file_port: FileIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
+    datasheet_port: (DatasheetIntelligencePort | None | _UnsetService) = _UNSET_SERVICE,
     file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
@@ -111,24 +116,41 @@ def create_app(
             )
         else:
             active_vision_port = vision_port
+        default_file_runtime = None
+        if default_experience_runtime is not None and (
+            isinstance(file_port, _UnsetService)
+            or isinstance(datasheet_port, _UnsetService)
+        ):
+            default_file_runtime = create_file_runtime(
+                active_settings,
+                CopilotFileReferenceCatalog(
+                    default_experience_runtime.attachment_repository,
+                    file_reference_paths or {},
+                ),
+            )
         if isinstance(file_port, _UnsetService):
             active_file_port: FileIntelligencePort | None = (
-                create_file_runtime(
-                    active_settings,
-                    CopilotFileReferenceCatalog(
-                        default_experience_runtime.attachment_repository,
-                        file_reference_paths or {},
-                    ),
-                ).file_port()
-                if default_experience_runtime is not None
+                default_file_runtime.file_port()
+                if default_file_runtime is not None
                 else None
             )
         else:
             active_file_port = file_port
+        if isinstance(datasheet_port, _UnsetService):
+            active_datasheet_port: DatasheetIntelligencePort | None = (
+                create_datasheet_runtime(
+                    default_file_runtime.extraction_port()
+                ).datasheet_port()
+                if default_file_runtime is not None
+                else None
+            )
+        else:
+            active_datasheet_port = datasheet_port
         application.state.settings = active_settings
         application.state.model_status_port = model_runtime.status_port()
         application.state.vision_port = active_vision_port
         application.state.file_port = active_file_port
+        application.state.datasheet_port = active_datasheet_port
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:
@@ -165,6 +187,14 @@ def create_app(
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
+        if request.url.path.endswith("/datasheets/analyze"):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": "datasheet_unavailable",
+                    "trace_id": request.state.trace_id,
+                },
+            )
         if request.url.path.startswith("/api/v1/copilot/"):
             return JSONResponse(
                 status_code=422,

@@ -12,6 +12,7 @@ from embedded_copilot.copilot.models import (
     safe_summary,
     utc_datetime,
 )
+from embedded_copilot.datasheet_runtime import DatasheetSummary
 from embedded_copilot.multimodal.context import AttachmentBinding
 from embedded_copilot.multimodal.models import (
     MultimodalInput,
@@ -212,6 +213,27 @@ class CopilotFileIntelligenceResponse(CopilotContractModel):
     @classmethod
     def validate_summary(cls, value: object) -> str:
         return safe_summary(value, field="summary")
+
+
+class CopilotDatasheetRequest(CopilotContractModel):
+    file_id: str
+    instruction_summary: str
+
+    @field_validator("file_id", mode="before")
+    @classmethod
+    def validate_file_id(cls, value: object) -> str:
+        return safe_identifier(value, field="file_id")
+
+    @field_validator("instruction_summary", mode="before")
+    @classmethod
+    def validate_instruction_summary(cls, value: object) -> str:
+        return safe_summary(value, field="instruction_summary")
+
+
+class CopilotDatasheetResponse(CopilotContractModel):
+    type: Literal["reasoning_suggestion"] = "reasoning_suggestion"
+    summary: DatasheetSummary
+    review_required: Literal[True] = True
 
 
 class CopilotModelStatusResponse(ContractModel):
