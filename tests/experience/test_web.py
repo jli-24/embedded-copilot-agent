@@ -36,6 +36,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         "Evidence",
         "Files",
         "File Intelligence",
+        "Datasheet Intelligence",
         "Progress",
         "Review",
         "Model Status",
@@ -53,6 +54,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         ("evidence", "Evidence"),
         ("files", "Files"),
         ("file_intelligence", "File Intelligence"),
+        ("datasheet_intelligence", "Datasheet Intelligence"),
         ("progress", "Progress"),
         ("review", "Review"),
         ("model_status", "Model Status"),
@@ -247,6 +249,11 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             file_id="file:1",
             instruction_summary="Analyze the file structure.",
         )
+        client.analyze_datasheet(
+            "session:1",
+            file_id="file:datasheet-1",
+            instruction_summary="Extract unverified datasheet candidates.",
+        )
         client.record_review(
             "session:1",
             intent_id="review:1",
@@ -268,12 +275,14 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("POST", "/api/v1/copilot/sessions/session:1/attachments"),
         ("POST", "/api/v1/copilot/sessions/session:1/vision"),
         ("POST", "/api/v1/copilot/sessions/session:1/files/analyze"),
+        ("POST", "/api/v1/copilot/sessions/session:1/datasheets/analyze"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
         ("GET", "/api/v1/copilot/models/status"),
     ]
     review_payload = json.loads(requests[-2].content)
     vision_payload = json.loads(requests[6].content)
     file_payload = json.loads(requests[7].content)
+    datasheet_payload = json.loads(requests[8].content)
     assert vision_payload == {
         "reference_id": "image:1",
         "instruction_summary": "Review the referenced schematic.",
@@ -281,6 +290,10 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
     assert file_payload == {
         "file_id": "file:1",
         "instruction_summary": "Analyze the file structure.",
+    }
+    assert datasheet_payload == {
+        "file_id": "file:datasheet-1",
+        "instruction_summary": "Extract unverified datasheet candidates.",
     }
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
@@ -549,6 +562,226 @@ def test_file_intelligence_page_has_no_file_access_controls() -> None:
         "st.rerun",
         "session_state[",
         "path",
+    ):
+        assert prohibited not in source
+
+
+def test_datasheet_page_renders_transient_structured_candidates() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.datasheet_intelligence as datasheet_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_datasheet(
+        self,
+        session_id,
+        *,
+        file_id,
+        instruction_summary,
+    ):
+        return {
+            "type": "reasoning_suggestion",
+            "summary": {
+                "candidate_semantics": "unverified",
+                "file_id": file_id,
+                "component_candidate": {
+                    "semantics": "candidate",
+                    "family": "STM32",
+                    "model": "STM32F103C8T6",
+                },
+                "interface_candidates": [
+                    {"semantics": "candidate", "name": "SPI"},
+                    {"semantics": "candidate", "name": "I2C"},
+                ],
+                "electrical_candidates": [
+                    {
+                        "semantics": "candidate",
+                        "kind": "voltage_range",
+                        "minimum": 2.0,
+                        "maximum": 3.6,
+                        "unit": "V",
+                    }
+                ],
+                "section_candidates": [
+                    {
+                        "semantics": "candidate",
+                        "name": "Electrical Characteristics",
+                    }
+                ],
+            },
+            "review_required": True,
+        }
+
+datasheet_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+datasheet_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_input[1].input("file:datasheet-1")
+    app.text_area[0].input("Extract unverified datasheet candidates.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.subheader) == (
+        "Component Candidate",
+        "Interface Candidates",
+        "Section Summary",
+    )
+    rendered = tuple(item.value for item in app.markdown)
+    assert "STM32 / STM32F103C8T6 (candidate)" in rendered
+    assert "SPI (candidate)" in rendered
+    assert "I2C (candidate)" in rendered
+    assert "Electrical Characteristics (candidate)" in rendered
+    assert tuple(item.value for item in app.caption) == (
+        "Candidate semantics: unverified",
+    )
+    assert tuple(item.value for item in app.warning) == (
+        "This output is not Engineering Evidence. Engineer validation required.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}
+
+
+def test_datasheet_page_renders_empty_candidates_without_fact_promotion() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.datasheet_intelligence as datasheet_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_datasheet(self, session_id, **kwargs):
+        return {
+            "type": "reasoning_suggestion",
+            "summary": {
+                "candidate_semantics": "unverified",
+                "file_id": kwargs["file_id"],
+                "component_candidate": None,
+                "interface_candidates": [],
+                "electrical_candidates": [],
+                "section_candidates": [],
+            },
+            "review_required": True,
+        }
+
+datasheet_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+datasheet_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_input[1].input("file:datasheet-1")
+    app.text_area[0].input("Extract unverified datasheet candidates.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.info) == (
+        "No component candidate detected.",
+        "No interface candidates detected.",
+        "No section candidates detected.",
+    )
+    assert not any("Engineering Fact" in item.value for item in app.markdown)
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ("api_error", "summary_fact_semantics", "electrical_fact_semantics"),
+)
+def test_datasheet_page_maps_api_and_candidate_contract_errors(outcome: str) -> None:
+    app = AppTest.from_string(
+        f"""
+import streamlit as st
+import web.copilot.app_pages.datasheet_intelligence as datasheet_page
+from web.copilot.client import ExperienceApiError
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_datasheet(self, session_id, **kwargs):
+        if {outcome!r} == "api_error":
+            raise ExperienceApiError("Datasheet analysis is unavailable.")
+        return {{
+            "type": "reasoning_suggestion",
+            "summary": {{
+                "candidate_semantics": (
+                    "engineering_fact"
+                    if {outcome!r} == "summary_fact_semantics"
+                    else "unverified"
+                ),
+                "file_id": kwargs["file_id"],
+                "component_candidate": None,
+                "interface_candidates": [],
+                "electrical_candidates": [
+                    {{
+                        "semantics": (
+                            "engineering_fact"
+                            if {outcome!r} == "electrical_fact_semantics"
+                            else "candidate"
+                        ),
+                        "kind": "voltage_range",
+                        "minimum": 2.0,
+                        "maximum": 3.6,
+                        "unit": "V",
+                    }}
+                ],
+                "section_candidates": [],
+            }},
+            "review_required": True,
+        }}
+
+datasheet_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+datasheet_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_input[1].input("file:datasheet-1")
+    app.text_area[0].input("Extract unverified datasheet candidates.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert len(app.error) == 1
+    assert not app.subheader
+
+
+def test_datasheet_page_has_no_file_or_fact_mutation_controls() -> None:
+    source = (
+        ROOT / "web" / "copilot" / "app_pages" / "datasheet_intelligence.py"
+    ).read_text(encoding="utf-8")
+
+    for prohibited in (
+        "file_uploader",
+        "download_button",
+        "open(",
+        "preview",
+        "st.rerun",
+        "session_state[",
+        "EngineeringFact",
+        "to_engineering_fact",
+        "approve",
+        "persist",
+        "save",
+        "generate",
     ):
         assert prohibited not in source
 

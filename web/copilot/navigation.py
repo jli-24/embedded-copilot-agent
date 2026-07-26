@@ -5,6 +5,7 @@ import streamlit as st
 from web.copilot.app_pages import (
     blueprint,
     chat,
+    datasheet_intelligence,
     evidence,
     file_intelligence,
     files,
@@ -25,6 +26,7 @@ PAGE_TITLES = (
     "Evidence",
     "Files",
     "File Intelligence",
+    "Datasheet Intelligence",
     "Progress",
     "Review",
     "Model Status",
@@ -76,6 +78,12 @@ def pages() -> tuple[st.Page, ...]:
             title="File Intelligence",
             icon=":material/document_scanner:",
             url_path="file-intelligence",
+        ),
+        st.Page(
+            datasheet_intelligence.render,
+            title="Datasheet Intelligence",
+            icon=":material/find_in_page:",
+            url_path="datasheet-intelligence",
         ),
         st.Page(
             progress.render,
