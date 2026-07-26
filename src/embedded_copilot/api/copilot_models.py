@@ -6,6 +6,10 @@ from typing import Literal
 from pydantic import Field, field_validator
 
 from embedded_copilot.conversation.models import ConversationMessage
+from embedded_copilot.context_runtime.contracts import (
+    EngineeringContextRequest,
+    EngineeringContextSummary,
+)
 from embedded_copilot.copilot.models import (
     CopilotContractModel,
     safe_identifier,
@@ -233,6 +237,36 @@ class CopilotDatasheetRequest(CopilotContractModel):
 class CopilotDatasheetResponse(CopilotContractModel):
     type: Literal["reasoning_suggestion"] = "reasoning_suggestion"
     summary: DatasheetSummary
+    review_required: Literal[True] = True
+
+
+class CopilotEngineeringContextRequest(CopilotContractModel):
+    task_intent: str
+    reference_ids: tuple[str, ...] = ()
+
+    @field_validator("task_intent", mode="before")
+    @classmethod
+    def validate_task_intent(cls, value: object) -> str:
+        return safe_summary(value, field="task_intent")
+
+    @field_validator("reference_ids", mode="before")
+    @classmethod
+    def validate_reference_ids(cls, value: object) -> object:
+        from embedded_copilot.copilot.models import identifier_tuple
+
+        return identifier_tuple(value, field="reference_id")
+
+    def to_context_request(self, session_id: str) -> EngineeringContextRequest:
+        return EngineeringContextRequest(
+            session_id=session_id,
+            task_intent=self.task_intent,
+            reference_ids=self.reference_ids,
+        )
+
+
+class CopilotEngineeringContextResponse(CopilotContractModel):
+    output_type: Literal["context_summary"] = "context_summary"
+    context_summary: EngineeringContextSummary
     review_required: Literal[True] = True
 
 

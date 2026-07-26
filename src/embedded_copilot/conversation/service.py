@@ -160,13 +160,13 @@ def _context_summaries(
     summary = response.context_summary
     projected = [f"Task intent: {summary.task_intent}."]
     for datasheet in summary.datasheets:
-        component = datasheet.component_candidate
+        component_candidate = datasheet.component_candidate
         component_text = "no component candidate"
-        if component is not None:
+        if component_candidate is not None:
             label = (
-                f"{component.family}/{component.model}"
-                if component.model is not None
-                else component.family
+                f"{component_candidate.family}/{component_candidate.model}"
+                if component_candidate.model is not None
+                else component_candidate.family
             )
             component_text = f"component candidate {label}"
         interfaces = ", ".join(item.name for item in datasheet.interfaces) or "none"

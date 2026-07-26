@@ -236,6 +236,14 @@ def create_app(
         request: Request,
         exc: RequestValidationError,
     ) -> JSONResponse:
+        if request.url.path.endswith("/context"):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": "context_unavailable",
+                    "trace_id": request.state.trace_id,
+                },
+            )
         if request.url.path.endswith("/datasheets/analyze"):
             return JSONResponse(
                 status_code=422,

@@ -12,6 +12,8 @@ from embedded_copilot.api.copilot_models import (
     CopilotAttachmentRequest,
     CopilotDatasheetRequest,
     CopilotDatasheetResponse,
+    CopilotEngineeringContextRequest,
+    CopilotEngineeringContextResponse,
     CopilotFileIntelligenceRequest,
     CopilotFileIntelligenceResponse,
     CopilotMessageRequest,
@@ -21,6 +23,14 @@ from embedded_copilot.api.copilot_models import (
     CopilotVisionResponse,
 )
 from embedded_copilot.conversation.models import ConversationMessage, ConversationTurn
+from embedded_copilot.context_runtime import EngineeringContextPort
+from embedded_copilot.context_runtime.exceptions import (
+    EngineeringContextConflict,
+    EngineeringContextReferenceNotFound,
+    EngineeringContextRejected,
+    EngineeringContextTimeout,
+    EngineeringContextUnavailable,
+)
 from embedded_copilot.conversation.repository import (
     ConversationNotFound,
     ConversationStateConflict,
@@ -113,6 +123,10 @@ def get_file_port(request: Request) -> FileIntelligencePort | None:
 
 def get_datasheet_port(request: Request) -> DatasheetIntelligencePort | None:
     return request.app.state.datasheet_port
+
+
+def get_context_port(request: Request) -> EngineeringContextPort | None:
+    return request.app.state.context_port
 
 
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
@@ -213,6 +227,30 @@ def _map_datasheet_error(request: Request, error: Exception) -> JSONResponse:
         (DatasheetAnalysisTimeout, FileAnalysisTimeout),
     ):
         return _datasheet_error(request, status_code=504)
+    raise error
+
+
+def _context_error(request: Request, *, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": "context_unavailable",
+            "trace_id": request.state.trace_id,
+        },
+    )
+
+
+def _map_context_error(request: Request, error: Exception) -> JSONResponse:
+    if isinstance(error, EngineeringContextReferenceNotFound):
+        return _context_error(request, status_code=404)
+    if isinstance(error, EngineeringContextConflict):
+        return _context_error(request, status_code=409)
+    if isinstance(error, (EngineeringContextRejected, ValidationError)):
+        return _context_error(request, status_code=422)
+    if isinstance(error, EngineeringContextUnavailable):
+        return _context_error(request, status_code=503)
+    if isinstance(error, EngineeringContextTimeout):
+        return _context_error(request, status_code=504)
     raise error
 
 
@@ -427,3 +465,26 @@ async def analyze_copilot_datasheet(
         )
     except Exception as error:
         return _map_datasheet_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/context",
+    response_model=CopilotEngineeringContextResponse,
+)
+async def compose_engineering_context(
+    session_id: str,
+    payload: CopilotEngineeringContextRequest,
+    request: Request,
+    port: EngineeringContextPort | None = Depends(get_context_port),
+) -> CopilotEngineeringContextResponse | JSONResponse:
+    if port is None:
+        return _context_error(request, status_code=503)
+    try:
+        response = await port.compose(payload.to_context_request(session_id))
+        return CopilotEngineeringContextResponse(
+            output_type=response.output_type,
+            context_summary=response.context_summary,
+            review_required=response.review_required,
+        )
+    except Exception as error:
+        return _map_context_error(request, error)
