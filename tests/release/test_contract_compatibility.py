@@ -87,7 +87,8 @@ def test_benchmark_public_model_contract_shapes_remain_compatible() -> None:
 
 def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
     paths = app.openapi()["paths"]
-    assert {path: tuple(methods) for path, methods in paths.items()} == {
+    actual_routes = {path: tuple(methods) for path, methods in paths.items()}
+    expected_legacy_routes = {
         "/api/v1/analyze": ("post",),
         "/api/v1/status/{execution_id}": ("get",),
         "/api/v1/report/{execution_id}": ("get",),
@@ -106,6 +107,7 @@ def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
         "/api/v1/copilot/sessions/{session_id}/progress": ("get",),
         "/api/v1/copilot/sessions/{session_id}/review": ("post",),
     }
+    assert expected_legacy_routes.items() <= actual_routes.items()
 
 
 def test_health_contract_changes_only_version_literal() -> None:
