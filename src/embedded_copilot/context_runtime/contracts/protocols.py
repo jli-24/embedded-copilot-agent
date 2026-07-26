@@ -20,6 +20,7 @@ class EngineeringContextPort(Protocol):
     ) -> EngineeringContextResponse: ...
 
 
+@runtime_checkable
 class ContextReferenceResolver(Protocol):
     def resolve(
         self,
@@ -27,6 +28,7 @@ class ContextReferenceResolver(Protocol):
     ) -> tuple[ContextReference, ...]: ...
 
 
+@runtime_checkable
 class FileContextSource(Protocol):
     async def summarize(
         self,
@@ -35,6 +37,7 @@ class FileContextSource(Protocol):
     ) -> FileContext: ...
 
 
+@runtime_checkable
 class DatasheetContextSource(Protocol):
     async def summarize(
         self,
@@ -43,6 +46,7 @@ class DatasheetContextSource(Protocol):
     ) -> DatasheetContext: ...
 
 
+@runtime_checkable
 class VisionContextSource(Protocol):
     async def summarize(
         self,

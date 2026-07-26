@@ -16,6 +16,12 @@ from embedded_copilot.api.copilot_routes import (
     WorkspaceService,
     router as copilot_router,
 )
+from embedded_copilot.api.context_adapters import (
+    CopilotContextReferenceResolver,
+    CopilotDatasheetContextSource,
+    CopilotFileContextSource,
+    CopilotVisionContextSource,
+)
 from embedded_copilot.api.experience_routes import (
     ExperienceService,
     router as experience_router,
@@ -27,6 +33,10 @@ from embedded_copilot.api.routes import ChatService, ProductAnalysisService, rou
 from embedded_copilot.datasheet_runtime import (
     DatasheetIntelligencePort,
     create_datasheet_runtime,
+)
+from embedded_copilot.context_runtime import (
+    EngineeringContextPort,
+    create_engineering_context_runtime,
 )
 from embedded_copilot.file_runtime import (
     FileIntelligencePort,
@@ -80,6 +90,7 @@ def create_app(
     vision_port: VisionPort | None | _UnsetService = _UNSET_SERVICE,
     file_port: FileIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
     datasheet_port: (DatasheetIntelligencePort | None | _UnsetService) = _UNSET_SERVICE,
+    context_port: EngineeringContextPort | None | _UnsetService = _UNSET_SERVICE,
     file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
@@ -146,11 +157,32 @@ def create_app(
             )
         else:
             active_datasheet_port = datasheet_port
+        if isinstance(context_port, _UnsetService):
+            active_context_port: EngineeringContextPort | None = (
+                create_engineering_context_runtime(
+                    file_port=CopilotFileContextSource(active_file_port),
+                    datasheet_port=CopilotDatasheetContextSource(
+                        active_datasheet_port
+                    ),
+                    vision_port=CopilotVisionContextSource(active_vision_port),
+                    reference_resolver=CopilotContextReferenceResolver(
+                        default_experience_runtime.attachment_repository
+                    ),
+                ).context_port()
+                if default_experience_runtime is not None
+                and active_file_port is not None
+                and active_datasheet_port is not None
+                and active_vision_port is not None
+                else None
+            )
+        else:
+            active_context_port = context_port
         application.state.settings = active_settings
         application.state.model_status_port = model_runtime.status_port()
         application.state.vision_port = active_vision_port
         application.state.file_port = active_file_port
         application.state.datasheet_port = active_datasheet_port
+        application.state.context_port = active_context_port
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:
