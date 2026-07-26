@@ -91,6 +91,7 @@ def _request() -> DatasheetRequest:
 
 def test_pdf_runtime_returns_only_candidate_dtos() -> None:
     payload = _pdf(
+        "STM32F103C8T6 Datasheet",
         "1 Electrical Characteristics",
         "Operating voltage range: 2000 mV to 3600 mV",
         "Operating temperature: -40 C to 85 C",
@@ -110,6 +111,11 @@ def test_pdf_runtime_returns_only_candidate_dtos() -> None:
     )
     assert response.summary == DatasheetSummary(
         file_id="file:1",
+        component_candidate={
+            "semantics": "candidate",
+            "family": "STM32",
+            "model": "STM32F103C8T6",
+        },
         electrical_candidates=(
             {
                 "semantics": "candidate",

@@ -13,6 +13,9 @@ from embedded_copilot.datasheet_runtime.exceptions import (
     DatasheetRuntimeError,
     DatasheetRuntimeUnavailable,
 )
+from embedded_copilot.datasheet_runtime.extractors.component import (
+    extract_component_candidate,
+)
 from embedded_copilot.datasheet_runtime.extractors.electrical import (
     extract_electrical_candidates,
 )
@@ -48,6 +51,7 @@ class _DatasheetExtractor:
         structure = self._parser.parse(stream, reference=reference)
         return DatasheetSummary(
             file_id=reference.file_id,
+            component_candidate=extract_component_candidate(structure),
             electrical_candidates=extract_electrical_candidates(structure),
             section_candidates=detect_sections(structure),
         )
