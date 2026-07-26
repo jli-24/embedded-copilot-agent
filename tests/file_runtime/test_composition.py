@@ -111,9 +111,7 @@ def test_datasheet_request_remains_structural_with_empty_candidates(
         _Catalog(reference),
     )
 
-    response = asyncio.run(
-        runtime.file_port().analyze(_request(FileType.DATASHEET))
-    )
+    response = asyncio.run(runtime.file_port().analyze(_request(FileType.DATASHEET)))
 
     assert response.summary == "DATASHEET file structure: 1 pages."
     assert "chip" not in response.summary.casefold()

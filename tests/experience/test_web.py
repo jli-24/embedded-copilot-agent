@@ -35,6 +35,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         "Blueprint",
         "Evidence",
         "Files",
+        "File Intelligence",
         "Progress",
         "Review",
         "Model Status",
@@ -51,6 +52,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         ("blueprint", "Blueprint"),
         ("evidence", "Evidence"),
         ("files", "Files"),
+        ("file_intelligence", "File Intelligence"),
         ("progress", "Progress"),
         ("review", "Review"),
         ("model_status", "Model Status"),
@@ -240,6 +242,11 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             reference_id="image:1",
             instruction_summary="Review the referenced schematic.",
         )
+        client.analyze_file(
+            "session:1",
+            file_id="file:1",
+            instruction_summary="Analyze the file structure.",
+        )
         client.record_review(
             "session:1",
             intent_id="review:1",
@@ -260,14 +267,20 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("POST", "/api/v1/copilot/sessions/session:1/messages"),
         ("POST", "/api/v1/copilot/sessions/session:1/attachments"),
         ("POST", "/api/v1/copilot/sessions/session:1/vision"),
+        ("POST", "/api/v1/copilot/sessions/session:1/files/analyze"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
         ("GET", "/api/v1/copilot/models/status"),
     ]
     review_payload = json.loads(requests[-2].content)
     vision_payload = json.loads(requests[6].content)
+    file_payload = json.loads(requests[7].content)
     assert vision_payload == {
         "reference_id": "image:1",
         "instruction_summary": "Review the referenced schematic.",
+    }
+    assert file_payload == {
+        "file_id": "file:1",
+        "instruction_summary": "Analyze the file structure.",
     }
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
@@ -466,6 +479,78 @@ vision_page.render()
         for key in app.session_state.filtered_state
         if not key.startswith("FormSubmitter:")
     } == {"session_id"}
+
+
+def test_file_intelligence_page_renders_transient_review_required_suggestion() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.file_intelligence as file_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_file(
+        self,
+        session_id,
+        *,
+        file_id,
+        instruction_summary,
+    ):
+        return {
+            "type": "reasoning_suggestion",
+            "summary": "File type SOURCE_CODE; 12 lines; 240 characters.",
+            "review_required": True,
+        }
+
+file_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+file_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_input[1].input("file:1")
+    app.text_area[0].input("Analyze the file structure.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.subheader) == (
+        "File Reference",
+        "AI Suggestion",
+    )
+    assert "file:1" in tuple(item.value for item in app.markdown)
+    assert "File type SOURCE_CODE; 12 lines; 240 characters." in tuple(
+        item.value for item in app.markdown
+    )
+    assert tuple(item.value for item in app.warning) == (
+        "This output is not Engineering Evidence. Engineer validation required.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}
+
+
+def test_file_intelligence_page_has_no_file_access_controls() -> None:
+    source = (
+        ROOT / "web" / "copilot" / "app_pages" / "file_intelligence.py"
+    ).read_text(encoding="utf-8")
+
+    for prohibited in (
+        "file_uploader",
+        "download_button",
+        "open(",
+        "preview",
+        "st.rerun",
+        "session_state[",
+        "path",
+    ):
+        assert prohibited not in source
 
 
 def test_upload_page_renders_transient_reference_receipt() -> None:

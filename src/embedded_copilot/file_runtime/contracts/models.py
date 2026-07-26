@@ -13,12 +13,45 @@ from pydantic import (
     model_validator,
 )
 
-from embedded_copilot.intelligence._validation import safe_identifier, safe_text
-
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:#-]{0,159}$")
+_ABSOLUTE_PATH = re.compile(
+    r"(?:[A-Za-z]:[\\/]|\\\\|file://|/(?:[^/\s]+/)+)",
+    re.IGNORECASE,
+)
+_SENSITIVE_TEXT = re.compile(
+    r"(?:api[_ -]?key\s*[:=]|access[_ -]?token\s*[:=]|bearer\s+"
+    r"|(?:password|credential|secret)\s*[:=]"
+    r"|(?:^|\s)sk-[A-Za-z0-9_-]{8,})",
+    re.IGNORECASE,
+)
 _STRUCTURAL_SUMMARY = re.compile(
     r"^(?:TEXT|SOURCE_CODE) file structure: \d+ lines, \d+ characters\.$"
     r"|^(?:PDF|DATASHEET) file structure: \d+ pages\.$"
 )
+
+
+def _safe_identifier(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    candidate = value.strip()
+    if not _SAFE_IDENTIFIER.fullmatch(candidate):
+        raise ValueError(f"{field} is invalid")
+    return candidate
+
+
+def _safe_text(value: object, *, field: str, max_length: int) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    candidate = value.strip()
+    if (
+        not candidate
+        or len(candidate) > max_length
+        or any(char in candidate for char in ("\r", "\n", "\x00"))
+        or _ABSOLUTE_PATH.search(candidate)
+        or _SENSITIVE_TEXT.search(candidate)
+    ):
+        raise ValueError(f"{field} is unsafe")
+    return candidate
 
 
 class _FileContract(BaseModel):
@@ -47,12 +80,12 @@ class FileReferenceRequest(_FileContract):
     @field_validator("session_id", "file_id", mode="before")
     @classmethod
     def validate_identifier(cls, value: object, info) -> str:
-        return safe_identifier(value, field=info.field_name)
+        return _safe_identifier(value, field=info.field_name)
 
     @field_validator("instruction_summary", mode="before")
     @classmethod
     def validate_instruction_summary(cls, value: object) -> str:
-        return safe_text(value, field="instruction_summary", max_length=512)
+        return _safe_text(value, field="instruction_summary", max_length=512)
 
 
 class FileReference(_FileContract):
@@ -66,7 +99,7 @@ class FileReference(_FileContract):
     @field_validator("session_id", "file_id", mode="before")
     @classmethod
     def validate_identifier(cls, value: object, info) -> str:
-        return safe_identifier(value, field=info.field_name)
+        return _safe_identifier(value, field=info.field_name)
 
     @field_validator("basename", mode="before")
     @classmethod
@@ -135,7 +168,7 @@ class DocumentSummary(_FileContract):
     @field_validator("file_id", mode="before")
     @classmethod
     def validate_file_id(cls, value: object) -> str:
-        return safe_identifier(value, field="file_id")
+        return _safe_identifier(value, field="file_id")
 
     @field_validator("document_type")
     @classmethod
@@ -170,7 +203,7 @@ class FileIntelligenceResponse(_FileContract):
     @field_validator("summary", mode="before")
     @classmethod
     def validate_summary(cls, value: object) -> str:
-        candidate = safe_text(value, field="summary", max_length=128)
+        candidate = _safe_text(value, field="summary", max_length=128)
         if not _STRUCTURAL_SUMMARY.fullmatch(candidate):
             raise ValueError("summary is not structural")
         return candidate

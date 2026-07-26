@@ -83,9 +83,7 @@ class _StructuralFilePort:
                 request,
                 self._extractor,
             )
-            return FileIntelligenceResponse(
-                summary=format_document_summary(summary)
-            )
+            return FileIntelligenceResponse(summary=format_document_summary(summary))
         except FileRuntimeError:
             raise
         except Exception:

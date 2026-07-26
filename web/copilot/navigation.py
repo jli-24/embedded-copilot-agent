@@ -6,6 +6,7 @@ from web.copilot.app_pages import (
     blueprint,
     chat,
     evidence,
+    file_intelligence,
     files,
     model_status,
     progress,
@@ -23,6 +24,7 @@ PAGE_TITLES = (
     "Blueprint",
     "Evidence",
     "Files",
+    "File Intelligence",
     "Progress",
     "Review",
     "Model Status",
@@ -68,6 +70,12 @@ def pages() -> tuple[st.Page, ...]:
             title="Files",
             icon=":material/folder:",
             url_path="files",
+        ),
+        st.Page(
+            file_intelligence.render,
+            title="File Intelligence",
+            icon=":material/document_scanner:",
+            url_path="file-intelligence",
         ),
         st.Page(
             progress.render,

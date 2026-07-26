@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 
 import pytest
@@ -178,9 +179,7 @@ def test_reader_rejects_symlink_escape(tmp_path: Path) -> None:
         link.symlink_to(real)
     except OSError:
         pytest.skip("symlink creation is unavailable")
-    reader = SecureFileReader(
-        RootedFileResolver(tmp_path, _Catalog(_reference(link)))
-    )
+    reader = SecureFileReader(RootedFileResolver(tmp_path, _Catalog(_reference(link))))
 
     with pytest.raises(FileReferenceConflict):
         reader.extract(_request(), _Extractor())
@@ -195,6 +194,44 @@ def test_reader_rejects_mismatched_document_type(tmp_path: Path) -> None:
             _Catalog(_reference(source, document_type=FileType.TEXT)),
         )
     )
+
+    with pytest.raises(FileReferenceConflict):
+        reader.extract(_request(), _Extractor())
+
+
+def test_resolver_rejects_leaf_descriptor_from_replaced_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "root"
+    original_parent = root / "nested"
+    original_parent.mkdir(parents=True)
+    original = original_parent / "main.py"
+    original.write_bytes(b"line one\nline two\n")
+    outside = tmp_path / "outside.py"
+    outside.write_bytes(b"line one\nline two\n")
+    reference = FileReference(
+        session_id="session:1",
+        file_id="file:1",
+        basename="main.py",
+        document_type=FileType.SOURCE_CODE,
+        size_bytes=original.stat().st_size,
+        relative_path=Path("nested/main.py"),
+    )
+    resolver = RootedFileResolver(root, _Catalog(reference))
+    real_open = os.open
+
+    class _SubstitutingOpenResolver:
+        def resolve(self, request: FileReferenceRequest):
+            with monkeypatch.context() as context:
+                context.setattr(
+                    os,
+                    "open",
+                    lambda path, flags: real_open(outside, flags),
+                )
+                return resolver.resolve(request)
+
+    reader = SecureFileReader(_SubstitutingOpenResolver())
 
     with pytest.raises(FileReferenceConflict):
         reader.extract(_request(), _Extractor())

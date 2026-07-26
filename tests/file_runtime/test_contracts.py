@@ -37,7 +37,7 @@ def test_file_reference_request_rejects_infrastructure_fields() -> None:
         "instruction_summary": "Inspect the referenced file structure.",
     }
 
-    request = FileReferenceRequest(**payload)
+    FileReferenceRequest(**payload)
 
     assert tuple(FileReferenceRequest.model_fields) == (
         "session_id",
@@ -160,9 +160,9 @@ def test_ports_are_read_only_and_facade_hides_runtime_internals() -> None:
 
 
 def test_file_intelligence_response_accepts_only_structural_summary() -> None:
-    assert FileIntelligenceResponse(
-        summary="PDF file structure: 12 pages."
-    ).model_dump(mode="json") == {
+    assert FileIntelligenceResponse(summary="PDF file structure: 12 pages.").model_dump(
+        mode="json"
+    ) == {
         "output_type": "reasoning_suggestion",
         "summary": "PDF file structure: 12 pages.",
         "review_required": True,

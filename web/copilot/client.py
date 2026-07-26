@@ -128,6 +128,22 @@ class CopilotExperienceClient:
             },
         )
 
+    def analyze_file(
+        self,
+        session_id: str,
+        *,
+        file_id: str,
+        instruction_summary: str,
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            f"{self._session_url(session_id)}/files/analyze",
+            json={
+                "file_id": file_id,
+                "instruction_summary": instruction_summary,
+            },
+        )
+
     def get_model_status(self) -> JsonObject:
         return self._request("GET", "/api/v1/copilot/models/status")
 

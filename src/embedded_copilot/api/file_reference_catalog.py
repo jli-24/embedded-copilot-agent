@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath, PureWindowsPath
 
-from embedded_copilot.copilot.models import safe_identifier
 from embedded_copilot.file_runtime import (
     FileReference,
     FileReferenceCatalog,
@@ -19,6 +19,7 @@ from embedded_copilot.multimodal.models import MultimodalInputType
 
 _SOURCE_SUFFIXES = frozenset({".c", ".cpp", ".h", ".py"})
 _TEXT_SUFFIXES = frozenset({".md", ".txt", ".log", ".json"})
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:#-]{0,159}$")
 
 
 class CopilotFileReferenceCatalog(FileReferenceCatalog):
@@ -38,8 +39,8 @@ class CopilotFileReferenceCatalog(FileReferenceCatalog):
             for raw_key, raw_path in copied.items():
                 if not isinstance(raw_key, tuple) or len(raw_key) != 2:
                     raise ValueError("invalid reference key")
-                session_id = safe_identifier(raw_key[0], field="session_id")
-                file_id = safe_identifier(raw_key[1], field="file_id")
+                session_id = _safe_identifier(raw_key[0], field="session_id")
+                file_id = _safe_identifier(raw_key[1], field="file_id")
                 key = (session_id.casefold(), file_id.casefold())
                 if key in normalized:
                     raise ValueError("duplicate reference")
@@ -50,11 +51,11 @@ class CopilotFileReferenceCatalog(FileReferenceCatalog):
 
     def resolve(self, session_id: str, file_id: str) -> FileReference | None:
         try:
-            session_key = safe_identifier(
+            session_key = _safe_identifier(
                 session_id,
                 field="session_id",
             ).casefold()
-            file_key = safe_identifier(file_id, field="file_id").casefold()
+            file_key = _safe_identifier(file_id, field="file_id").casefold()
             relative_path = self._paths.get((session_key, file_key))
             if relative_path is None:
                 return None
@@ -93,6 +94,15 @@ def _relative_path(value: object) -> Path:
     ):
         raise ValueError("invalid path")
     return Path(raw)
+
+
+def _safe_identifier(value: object, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be a string")
+    candidate = value.strip()
+    if not _SAFE_IDENTIFIER.fullmatch(candidate):
+        raise ValueError(f"{field} is invalid")
+    return candidate
 
 
 def _document_type(basename: str) -> FileType:
