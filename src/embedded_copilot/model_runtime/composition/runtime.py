@@ -9,6 +9,9 @@ from embedded_copilot.model_runtime.composition.config import (
 from embedded_copilot.model_runtime.facade import ModelRuntime
 from embedded_copilot.model_runtime.gateway.model import ModelGateway
 from embedded_copilot.model_runtime.gateway.reasoning import GatewayReasoningPort
+from embedded_copilot.model_runtime.gateway.presentation import (
+    GatewayPresentationEnhancer,
+)
 from embedded_copilot.model_runtime.health.status import (
     OllamaStatusPort,
     UnavailableStatusPort,
@@ -47,4 +50,8 @@ def create_model_runtime(
     registry = ProviderRegistry(providers)
     router = ModelRouter(registry)
     gateway = ModelGateway(router)
-    return ModelRuntime._compose(GatewayReasoningPort(gateway), status)
+    return ModelRuntime._compose(
+        GatewayReasoningPort(gateway),
+        status,
+        GatewayPresentationEnhancer(gateway),
+    )

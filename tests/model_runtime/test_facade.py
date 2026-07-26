@@ -41,7 +41,7 @@ class _Status:
 
 def test_model_runtime_can_only_be_created_by_production_factory() -> None:
     with pytest.raises(TypeError, match="composition factory"):
-        ModelRuntime(_Reasoning(), _Status())
+        ModelRuntime(_Reasoning(), _Status(), object())  # type: ignore[arg-type]
 
     runtime = create_model_runtime(Settings(_env_file=None))
 
@@ -73,11 +73,17 @@ def test_facade_exposes_only_protocol_ports_without_runtime_configuration() -> N
 def test_facade_methods_are_annotated_with_protocols() -> None:
     reasoning_hints = get_type_hints(ModelRuntime.reasoning_port)
     status_hints = get_type_hints(ModelRuntime.status_port)
+    enhancement_hints = get_type_hints(ModelRuntime.enhance_reasoning_port)
 
     assert reasoning_hints["return"] is ReasoningPort
     assert status_hints["return"] is StatusPort
+    assert enhancement_hints["return"].__name__ == "ReasoningPort"
     assert inspect.signature(ModelRuntime.reasoning_port).parameters.keys() == {"self"}
     assert inspect.signature(ModelRuntime.status_port).parameters.keys() == {"self"}
+    assert tuple(inspect.signature(ModelRuntime.enhance_reasoning_port).parameters) == (
+        "self",
+        "base",
+    )
 
 
 def test_status_port_returns_immutable_safe_response_dto() -> None:

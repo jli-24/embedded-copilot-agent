@@ -50,6 +50,7 @@ def test_package_has_exact_public_exports() -> None:
     assert public_runtime.__all__ == [
         "CapabilityEntry",
         "NextStep",
+        "PresentationPatch",
         "ReasoningAnalysisTimeout",
         "ReasoningContextConflict",
         "ReasoningContextNotFound",

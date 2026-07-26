@@ -363,6 +363,15 @@ class ReasoningSummary(_ReasoningContract):
         )
 
 
+class PresentationPatch(_ReasoningContract):
+    summary: str
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def validate_summary(cls, value: object) -> str:
+        return _safe_text(value, field="presentation patch", max_length=512)
+
+
 class ReasoningTrace(_ReasoningContract):
     trace_id: str
     context_id: str

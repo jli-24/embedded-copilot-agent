@@ -4,6 +4,7 @@ from embedded_copilot.reasoning_runtime.composition import create_reasoning_runt
 from embedded_copilot.reasoning_runtime.contracts import (
     CapabilityEntry,
     NextStep,
+    PresentationPatch,
     ReasoningContextSnapshot,
     ReasoningPort,
     ReasoningRequest,
@@ -31,6 +32,7 @@ from embedded_copilot.reasoning_runtime.snapshot import (
 __all__ = [
     "CapabilityEntry",
     "NextStep",
+    "PresentationPatch",
     "ReasoningAnalysisTimeout",
     "ReasoningContextConflict",
     "ReasoningContextNotFound",
