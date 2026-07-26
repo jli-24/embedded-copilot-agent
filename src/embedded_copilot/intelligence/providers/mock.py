@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
-from embedded_copilot.intelligence.models import ModelInput, ModelResponse
+from embedded_copilot.intelligence.models import (
+    ModelCapability,
+    ModelInput,
+    ModelResponse,
+)
 from embedded_copilot.schemas.model import ModelRequest, ModelTaskType
 
 
@@ -12,13 +16,18 @@ class DeterministicMockProvider:
         self,
         *,
         provider_id: str = "mock-provider",
-        supported_tasks: tuple[ModelTaskType, ...] = tuple(ModelTaskType),
+        supported_tasks: tuple[
+            ModelCapability | ModelTaskType,
+            ...,
+        ] = tuple(ModelCapability),
         response_text: str = (
             "This is a reasoning suggestion requiring Engineering Agent validation."
         ),
     ) -> None:
         self.provider_id = provider_id
-        self.supported_tasks = supported_tasks
+        self.supported_tasks = tuple(
+            ModelCapability(task.value) for task in supported_tasks
+        )
         self._response_text = response_text
         self._call_count = 0
 
@@ -43,7 +52,7 @@ class UnavailableLocalModelProvider:
     """Explicit placeholder; it never pretends a local model is configured."""
 
     provider_id = "local-model"
-    supported_tasks = tuple(ModelTaskType)
+    supported_tasks = tuple(ModelCapability)
 
     async def generate(
         self,

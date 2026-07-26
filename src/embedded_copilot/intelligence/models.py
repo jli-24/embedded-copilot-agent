@@ -4,6 +4,7 @@ import copy
 import math
 import re
 from collections.abc import Iterator, Mapping
+from enum import StrEnum
 from typing import Literal, TypeAlias
 
 from pydantic import (
@@ -22,29 +23,7 @@ from embedded_copilot.intelligence._validation import (
 from embedded_copilot.schemas.result import ContractModel
 
 ModelMetadataScalar: TypeAlias = str | int | float | bool | None
-_FORBIDDEN_METADATA_PARTS = frozenset(
-    {
-        "api_key",
-        "artifact",
-        "artifact_decision",
-        "component",
-        "components",
-        "connection",
-        "connections",
-        "credential",
-        "current",
-        "decision",
-        "electrical_parameter",
-        "evidence",
-        "gpio",
-        "password",
-        "path",
-        "secret",
-        "token",
-        "voltage",
-    }
-)
-_METADATA_KEY = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+_ALLOWED_METADATA_KEYS = frozenset({"cached", "finish_reason", "latency_ms"})
 
 
 class IntelligenceContractModel(ContractModel):
@@ -54,6 +33,13 @@ class IntelligenceContractModel(ContractModel):
         hide_input_in_errors=True,
         revalidate_instances="always",
     )
+
+
+class ModelCapability(StrEnum):
+    CHAT = "CHAT"
+    VISION = "VISION"
+    CODE = "CODE"
+    REASONING = "REASONING"
 
 
 class _FrozenMetadata(Mapping[str, ModelMetadataScalar]):
@@ -87,17 +73,24 @@ def _validated_metadata(value: object) -> dict[str, ModelMetadataScalar]:
         if not isinstance(raw_key, str):
             raise ValueError("model metadata key is invalid")
         key = raw_key.strip().casefold()
-        if not _METADATA_KEY.fullmatch(key) or any(
-            part in key for part in _FORBIDDEN_METADATA_PARTS
-        ):
+        if key not in _ALLOWED_METADATA_KEYS:
             raise ValueError("model metadata key is forbidden")
-        if raw_value is not None and not isinstance(raw_value, (str, int, float, bool)):
-            raise ValueError("model metadata value is invalid")
-        item: ModelMetadataScalar = raw_value
-        if isinstance(item, str):
-            item = safe_text(item, field="model metadata", max_length=256)
-        if isinstance(item, float) and not math.isfinite(item):
+        item: ModelMetadataScalar
+        if key == "cached":
+            if not isinstance(raw_value, bool):
+                raise ValueError("model metadata value is invalid")
+            item = raw_value
+        elif key == "finish_reason":
+            item = safe_text(raw_value, field="model metadata", max_length=64)
+        elif (
+            isinstance(raw_value, bool)
+            or not isinstance(raw_value, (int, float))
+            or not math.isfinite(raw_value)
+            or raw_value < 0
+        ):
             raise ValueError("model metadata number is invalid")
+        else:
+            item = raw_value
         validated[key] = item
     return dict(sorted(validated.items()))
 

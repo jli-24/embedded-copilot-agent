@@ -7,7 +7,11 @@ from embedded_copilot.intelligence.exceptions import (
     ModelGatewayError,
     ModelProviderUnavailable,
 )
-from embedded_copilot.intelligence.models import ModelInput, ModelResponse
+from embedded_copilot.intelligence.models import (
+    ModelCapability,
+    ModelInput,
+    ModelResponse,
+)
 from embedded_copilot.intelligence.providers.base import ModelProvider
 from embedded_copilot.intelligence.routing import select_provider, validate_providers
 from embedded_copilot.schemas.model import ModelRequest
@@ -30,7 +34,10 @@ class ModelGateway:
         isolated_input = ModelInput.model_validate(
             copy.deepcopy(model_input.model_dump(mode="python"))
         )
-        provider = select_provider(self._providers, isolated_request.task_type)
+        provider = select_provider(
+            self._providers,
+            ModelCapability(isolated_request.task_type.value),
+        )
         try:
             raw_response = await provider.generate(isolated_request, isolated_input)
             response = ModelResponse.model_validate(

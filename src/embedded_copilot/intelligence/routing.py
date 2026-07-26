@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from embedded_copilot.intelligence._validation import safe_identifier
 from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
+from embedded_copilot.intelligence.models import ModelCapability
 from embedded_copilot.intelligence.providers.base import ModelProvider
 from embedded_copilot.schemas.model import ModelTaskType
 
@@ -16,14 +17,13 @@ def validate_providers(
     for provider in providers:
         try:
             provider_id = safe_identifier(provider.provider_id, field="provider_id")
-            tasks = provider.supported_tasks
+            tasks = _capabilities(provider.supported_tasks)
             generate = provider.generate
         except Exception as exc:
             raise ValueError("model provider configuration is invalid") from exc
         if (
             not isinstance(tasks, tuple)
             or not tasks
-            or any(not isinstance(task, ModelTaskType) for task in tasks)
             or len(set(tasks)) != len(tasks)
             or not callable(generate)
             or provider_id.casefold() in identifiers
@@ -36,9 +36,24 @@ def validate_providers(
 
 def select_provider(
     providers: Sequence[ModelProvider],
-    task: ModelTaskType,
+    capability: ModelCapability,
 ) -> ModelProvider:
     for provider in providers:
-        if task in provider.supported_tasks:
+        if capability in _capabilities(provider.supported_tasks):
             return provider
     raise ModelProviderUnavailable("model provider is unavailable")
+
+
+def _capabilities(
+    tasks: object,
+) -> tuple[ModelCapability, ...]:
+    if not isinstance(tasks, tuple) or not tasks:
+        raise ValueError("model provider configuration is invalid")
+    try:
+        return tuple(
+            ModelCapability(task.value)
+            for task in tasks
+            if isinstance(task, (ModelCapability, ModelTaskType))
+        )
+    except ValueError:
+        raise ValueError("model provider configuration is invalid") from None
