@@ -122,15 +122,9 @@ def _runtime() -> tuple[
     _VisionPort,
 ]:
     repository = ProcessLocalAttachmentBindingRepository()
-    repository.bind(
-        _binding("file:source-1", MultimodalInputType.FILE, "main.c")
-    )
-    repository.bind(
-        _binding("file:datasheet-1", MultimodalInputType.FILE, "mcu.pdf")
-    )
-    repository.bind(
-        _binding("image:1", MultimodalInputType.IMAGE, "schematic.png")
-    )
+    repository.bind(_binding("file:source-1", MultimodalInputType.FILE, "main.c"))
+    repository.bind(_binding("file:datasheet-1", MultimodalInputType.FILE, "mcu.pdf"))
+    repository.bind(_binding("image:1", MultimodalInputType.IMAGE, "schematic.png"))
     file_port = _FilePort()
     datasheet_port = _DatasheetPort()
     vision_port = _VisionPort()

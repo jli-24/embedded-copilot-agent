@@ -160,6 +160,22 @@ class CopilotExperienceClient:
             },
         )
 
+    def compose_engineering_context(
+        self,
+        session_id: str,
+        *,
+        task_intent: str,
+        reference_ids: tuple[str, ...],
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            f"{self._session_url(session_id)}/context",
+            json={
+                "task_intent": task_intent,
+                "reference_ids": list(reference_ids),
+            },
+        )
+
     def get_model_status(self) -> JsonObject:
         return self._request("GET", "/api/v1/copilot/models/status")
 

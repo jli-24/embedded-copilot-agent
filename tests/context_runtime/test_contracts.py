@@ -90,9 +90,7 @@ def test_context_summary_preserves_source_scoped_candidate_semantics() -> None:
                     model="ESP32-S3",
                 ),
                 interfaces=(InterfaceContextCandidate(name="I2C"),),
-                sections=(
-                    SectionContextCandidate(name="Electrical Characteristics"),
-                ),
+                sections=(SectionContextCandidate(name="Electrical Characteristics"),),
             ),
         ),
         files=(

@@ -24,7 +24,9 @@ from embedded_copilot.services.config import Settings
 
 class _ChatService:
     async def chat(self, message: str, *, trace_id: str) -> ChatResponse:
-        return ChatResponse(answer="Existing chat remains available.", trace_id=trace_id)
+        return ChatResponse(
+            answer="Existing chat remains available.", trace_id=trace_id
+        )
 
 
 class _ContextPort:

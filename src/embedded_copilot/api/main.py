@@ -93,7 +93,7 @@ def create_app(
     experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
     vision_port: VisionPort | None | _UnsetService = _UNSET_SERVICE,
     file_port: FileIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
-    datasheet_port: (DatasheetIntelligencePort | None | _UnsetService) = _UNSET_SERVICE,
+    datasheet_port: DatasheetIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
     context_port: EngineeringContextPort | None | _UnsetService = _UNSET_SERVICE,
     file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
 ) -> FastAPI:
@@ -152,9 +152,7 @@ def create_app(
             active_context_port: EngineeringContextPort | None = (
                 create_engineering_context_runtime(
                     file_port=CopilotFileContextSource(active_file_port),
-                    datasheet_port=CopilotDatasheetContextSource(
-                        active_datasheet_port
-                    ),
+                    datasheet_port=CopilotDatasheetContextSource(active_datasheet_port),
                     vision_port=CopilotVisionContextSource(active_vision_port),
                     reference_resolver=CopilotContextReferenceResolver(
                         default_attachment_repository

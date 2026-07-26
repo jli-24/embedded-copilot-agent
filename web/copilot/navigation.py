@@ -6,6 +6,7 @@ from web.copilot.app_pages import (
     blueprint,
     chat,
     datasheet_intelligence,
+    engineering_context,
     evidence,
     file_intelligence,
     files,
@@ -27,6 +28,7 @@ PAGE_TITLES = (
     "Files",
     "File Intelligence",
     "Datasheet Intelligence",
+    "Engineering Context",
     "Progress",
     "Review",
     "Model Status",
@@ -84,6 +86,12 @@ def pages() -> tuple[st.Page, ...]:
             title="Datasheet Intelligence",
             icon=":material/find_in_page:",
             url_path="datasheet-intelligence",
+        ),
+        st.Page(
+            engineering_context.render,
+            title="Engineering Context",
+            icon=":material/hub:",
+            url_path="engineering-context",
         ),
         st.Page(
             progress.render,

@@ -37,6 +37,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         "Files",
         "File Intelligence",
         "Datasheet Intelligence",
+        "Engineering Context",
         "Progress",
         "Review",
         "Model Status",
@@ -55,6 +56,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         ("files", "Files"),
         ("file_intelligence", "File Intelligence"),
         ("datasheet_intelligence", "Datasheet Intelligence"),
+        ("engineering_context", "Engineering Context"),
         ("progress", "Progress"),
         ("review", "Review"),
         ("model_status", "Model Status"),
@@ -254,6 +256,11 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             file_id="file:datasheet-1",
             instruction_summary="Extract unverified datasheet candidates.",
         )
+        client.compose_engineering_context(
+            "session:1",
+            task_intent="Review referenced embedded context.",
+            reference_ids=("file:datasheet-1", "image:1"),
+        )
         client.record_review(
             "session:1",
             intent_id="review:1",
@@ -276,6 +283,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("POST", "/api/v1/copilot/sessions/session:1/vision"),
         ("POST", "/api/v1/copilot/sessions/session:1/files/analyze"),
         ("POST", "/api/v1/copilot/sessions/session:1/datasheets/analyze"),
+        ("POST", "/api/v1/copilot/sessions/session:1/context"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
         ("GET", "/api/v1/copilot/models/status"),
     ]
@@ -283,6 +291,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
     vision_payload = json.loads(requests[6].content)
     file_payload = json.loads(requests[7].content)
     datasheet_payload = json.loads(requests[8].content)
+    context_payload = json.loads(requests[9].content)
     assert vision_payload == {
         "reference_id": "image:1",
         "instruction_summary": "Review the referenced schematic.",
@@ -294,6 +303,10 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
     assert datasheet_payload == {
         "file_id": "file:datasheet-1",
         "instruction_summary": "Extract unverified datasheet candidates.",
+    }
+    assert context_payload == {
+        "task_intent": "Review referenced embedded context.",
+        "reference_ids": ["file:datasheet-1", "image:1"],
     }
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
@@ -782,6 +795,220 @@ def test_datasheet_page_has_no_file_or_fact_mutation_controls() -> None:
         "persist",
         "save",
         "generate",
+    ):
+        assert prohibited not in source
+
+
+def test_engineering_context_page_renders_transient_safe_groups() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.engineering_context as context_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def compose_engineering_context(
+        self,
+        session_id,
+        *,
+        task_intent,
+        reference_ids,
+    ):
+        return {
+            "output_type": "context_summary",
+            "context_summary": {
+                "context_id": "context:0123456789abcdef01234567",
+                "task_intent": task_intent,
+                "datasheets": [
+                    {
+                        "candidate_semantics": "unverified",
+                        "file_id": "file:datasheet-1",
+                        "component_candidate": {
+                            "semantics": "candidate",
+                            "family": "ESP32",
+                            "model": "ESP32-S3",
+                        },
+                        "interfaces": [
+                            {"semantics": "candidate", "name": "I2C"}
+                        ],
+                        "sections": [
+                            {
+                                "semantics": "candidate",
+                                "name": "Electrical Characteristics",
+                            }
+                        ],
+                    }
+                ],
+                "files": [
+                    {
+                        "file_id": "file:datasheet-1",
+                        "document_type": "PDF",
+                        "page_count": 64,
+                        "line_count": None,
+                        "character_count": None,
+                    }
+                ],
+                "vision": [
+                    {"reference_id": "image:1", "image_type": "unknown"}
+                ],
+            },
+            "review_required": True,
+        }
+
+context_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+context_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_area[0].input("Review referenced embedded context.")
+    app.text_area[1].input("file:datasheet-1\nimage:1")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.subheader) == (
+        "Task Intent",
+        "File Summary",
+        "Datasheet Candidates",
+        "Vision References",
+    )
+    rendered = tuple(item.value for item in app.markdown)
+    assert "Review referenced embedded context." in rendered
+    assert "file:datasheet-1: PDF, 64 pages" in rendered
+    assert "ESP32 / ESP32-S3 (candidate)" in rendered
+    assert "I2C (candidate)" in rendered
+    assert "Electrical Characteristics (candidate)" in rendered
+    assert "image:1: unknown" in rendered
+    assert tuple(item.value for item in app.warning) == (
+        "This output is contextual information only.\nEngineer validation required.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}
+
+
+def test_engineering_context_page_renders_empty_groups() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.engineering_context as context_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def compose_engineering_context(self, session_id, **kwargs):
+        return {
+            "output_type": "context_summary",
+            "context_summary": {
+                "context_id": "context:0123456789abcdef01234567",
+                "task_intent": kwargs["task_intent"],
+                "datasheets": [],
+                "files": [],
+                "vision": [],
+            },
+            "review_required": True,
+        }
+
+context_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+context_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_area[0].input("Review current engineering task context.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.info) == (
+        "No file context available.",
+        "No datasheet candidates available.",
+        "No vision references available.",
+    )
+
+
+@pytest.mark.parametrize("outcome", ("api_error", "fact_semantics"))
+def test_engineering_context_page_shows_safe_errors(outcome: str) -> None:
+    app = AppTest.from_string(
+        f"""
+import streamlit as st
+import web.copilot.app_pages.engineering_context as context_page
+from web.copilot.client import ExperienceApiError
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def compose_engineering_context(self, session_id, **kwargs):
+        if {outcome!r} == "api_error":
+            raise ExperienceApiError("Copilot API request failed.")
+        return {{
+            "output_type": "context_summary",
+            "context_summary": {{
+                "context_id": "context:0123456789abcdef01234567",
+                "task_intent": kwargs["task_intent"],
+                "datasheets": [{{
+                    "candidate_semantics": "engineering_fact",
+                    "file_id": "file:1",
+                    "component_candidate": None,
+                    "interfaces": [],
+                    "sections": [],
+                }}],
+                "files": [],
+                "vision": [],
+            }},
+            "review_required": True,
+        }}
+
+context_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+context_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_area[0].input("Review current engineering task context.")
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert len(app.error) == 1
+    assert not app.subheader
+
+
+def test_engineering_context_page_has_no_access_or_mutation_capability() -> None:
+    source = (
+        ROOT / "web" / "copilot" / "app_pages" / "engineering_context.py"
+    ).read_text(encoding="utf-8")
+
+    for prohibited in (
+        "file_uploader",
+        "download_button",
+        "open(",
+        "preview",
+        "session_state[",
+        "context_runtime",
+        "datasheet_runtime",
+        "vision_runtime",
+        "file_runtime",
+        "parser",
+        "reader",
+        "filesystem",
+        "write",
+        "patch",
+        "execute",
+        "generate_code",
     ):
         assert prohibited not in source
 
