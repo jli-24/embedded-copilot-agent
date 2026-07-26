@@ -1,0 +1,26 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:9ba7ec3923c2f0b70a1805a6e762cbd0c77fc1f94c274baf420c195a2d642506",
+    "context_id": "context:000000000000000000000005",
+    "task_intent": "Review firmware context.",
+    "reference_ids": ["file:source-1"],
+    "source_types": ["FILE"],
+    "datasheet_candidates": [],
+    "file_summaries": [
+      {
+        "file_id": "file:source-1",
+        "document_type": "SOURCE_CODE",
+        "line_count": 100,
+        "character_count": 1000
+      }
+    ],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "low",
+    "risks": ["firmware_configuration"],
+    "triggered_rules": ["firmware_configuration_review_required"],
+    "next_steps": ["Inspect firmware configuration against verified requirements"]
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:b4694b2eae656cc45ae22fad2cbd101379e325c871f5c9cf01ad96b6ce26a12c",
+    "context_id": "context:000000000000000000000007",
+    "task_intent": "Review STM32 PWM timer configuration.",
+    "reference_ids": ["file:stm32"],
+    "source_types": ["DATASHEET"],
+    "datasheet_candidates": [
+      {
+        "candidate_semantics": "unverified",
+        "file_id": "file:stm32",
+        "component_candidate": {
+          "semantics": "candidate",
+          "family": "STM32",
+          "model": "STM32F103"
+        },
+        "interfaces": [],
+        "sections": []
+      }
+    ],
+    "file_summaries": [
+      {
+        "file_id": "file:stm32",
+        "document_type": "PDF",
+        "page_count": 40
+      }
+    ],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "medium",
+    "risks": [],
+    "triggered_rules": [],
+    "next_steps": ["Review the available candidates with an engineer"]
+  }
+}

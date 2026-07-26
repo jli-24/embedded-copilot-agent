@@ -1,0 +1,19 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:2ea97e1796beab1ed27e4d69a35aca7647976996511bc3f054a0d766d3e6588f",
+    "context_id": "context:000000000000000000000001",
+    "task_intent": "Review empty engineering context.",
+    "reference_ids": [],
+    "source_types": [],
+    "datasheet_candidates": [],
+    "file_summaries": [],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "low",
+    "risks": ["context_completeness"],
+    "triggered_rules": ["missing_context"],
+    "next_steps": ["Provide relevant engineering references"]
+  }
+}

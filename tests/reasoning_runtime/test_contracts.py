@@ -142,5 +142,15 @@ def test_foundation_runtime_returns_review_required_canonical_response() -> None
         "1.0",
     )
     assert tuple(item.category for item in response.risks) == ("context_completeness",)
+    assert tuple(
+        (item.name, item.version) for item in response.trace.capabilities_applied
+    ) == (
+        ("context_analysis", "1.0"),
+        ("risk_detection", "1.0"),
+        ("verification_planning", "1.0"),
+    )
+    assert tuple(item.action for item in response.next_steps) == (
+        "Provide relevant engineering references",
+    )
     assert response.trace.trace_id == "trace:1"
     assert response.review_required is True

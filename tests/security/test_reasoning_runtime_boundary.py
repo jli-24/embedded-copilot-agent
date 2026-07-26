@@ -129,7 +129,12 @@ def test_future_agents_receive_only_reasoning_analysis() -> None:
 
 def test_rules_are_pure_and_cannot_read_task_intent_keywords() -> None:
     rules = RUNTIME / "rules"
-    for path in _python_files(rules):
+    pure_files = (
+        *_python_files(rules),
+        RUNTIME / "planning" / "planner.py",
+        RUNTIME / "analysis" / "analyzer.py",
+    )
+    for path in pure_files:
         tree = _tree(path)
         for module in _imports(tree):
             assert module.split(".", 1)[0] not in PURE_RULE_FORBIDDEN_IMPORTS, path

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 
 from embedded_copilot.reasoning_runtime.analysis.analyzer import analyze_context
+from embedded_copilot.reasoning_runtime.capabilities import active_capabilities
 from embedded_copilot.reasoning_runtime.contracts import (
     ReasoningRequest,
     ReasoningResponse,
@@ -13,6 +14,7 @@ from embedded_copilot.reasoning_runtime.rules import (
     evaluate_rules,
     project_risks,
 )
+from embedded_copilot.reasoning_runtime.planning import plan_next_steps
 
 
 class CanonicalReasoningPort:
@@ -30,14 +32,19 @@ class CanonicalReasoningPort:
         )
         rules = evaluate_rules(context)
         risks = project_risks(context, rules)
-        sections = ("summary", "risk") if risks else ("summary",)
+        next_steps = plan_next_steps(rules)
+        sections = (
+            ("summary", "risk", "next_step") if risks else ("summary", "next_step")
+        )
         return ReasoningResponse(
             reasoning_summary=analyze_context(snapshot),
             risks=risks,
+            next_steps=next_steps,
             trace=ReasoningTrace(
                 trace_id=isolated.trace_id,
                 context_id=snapshot.context_id,
                 snapshot_fingerprint=snapshot.snapshot_fingerprint,
+                capabilities_applied=active_capabilities(),
                 rules_applied=rules,
                 generated_sections=sections,
             ),

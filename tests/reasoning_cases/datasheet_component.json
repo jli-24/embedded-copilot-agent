@@ -1,0 +1,37 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:1e8eb21181d86a6eebbccc75693569eb67aab29bef53740d9bcb208468410025",
+    "context_id": "context:000000000000000000000002",
+    "task_intent": "Review a datasheet component candidate.",
+    "reference_ids": ["file:datasheet-1"],
+    "source_types": ["DATASHEET"],
+    "datasheet_candidates": [
+      {
+        "candidate_semantics": "unverified",
+        "file_id": "file:datasheet-1",
+        "component_candidate": {
+          "semantics": "candidate",
+          "family": "ESP32",
+          "model": "ESP32-S3"
+        },
+        "interfaces": [],
+        "sections": []
+      }
+    ],
+    "file_summaries": [
+      {
+        "file_id": "file:datasheet-1",
+        "document_type": "PDF",
+        "page_count": 10
+      }
+    ],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "medium",
+    "risks": [],
+    "triggered_rules": [],
+    "next_steps": ["Review the available candidates with an engineer"]
+  }
+}

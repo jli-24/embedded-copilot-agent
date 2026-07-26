@@ -1,0 +1,24 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:8434408b75b37d119a859a6a2e75f8a20399ebe96565af1b6a664231fc9bdee5",
+    "context_id": "context:000000000000000000000004",
+    "task_intent": "Review a referenced image.",
+    "reference_ids": ["image:1"],
+    "source_types": ["VISION"],
+    "datasheet_candidates": [],
+    "file_summaries": [],
+    "vision_refs": [
+      {
+        "reference_id": "image:1",
+        "image_type": "unknown"
+      }
+    ]
+  },
+  "expected": {
+    "confidence": "low",
+    "risks": ["visual_interpretation"],
+    "triggered_rules": ["visual_observation_review_required"],
+    "next_steps": ["Obtain engineer-reviewed visual observations"]
+  }
+}

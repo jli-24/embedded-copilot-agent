@@ -1,0 +1,40 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:a39faed375ee0dbaffbbf141c5a9bb1d26db98c444ff27b8aecc994944384ba1",
+    "context_id": "context:000000000000000000000006",
+    "task_intent": "Review ESP32 camera WiFi UDP communication.",
+    "reference_ids": ["file:esp32"],
+    "source_types": ["DATASHEET"],
+    "datasheet_candidates": [
+      {
+        "candidate_semantics": "unverified",
+        "file_id": "file:esp32",
+        "component_candidate": {
+          "semantics": "candidate",
+          "family": "ESP32",
+          "model": "ESP32-S3"
+        },
+        "interfaces": [
+          {"semantics": "candidate", "name": "SPI"},
+          {"semantics": "candidate", "name": "I2C"}
+        ],
+        "sections": []
+      }
+    ],
+    "file_summaries": [
+      {
+        "file_id": "file:esp32",
+        "document_type": "PDF",
+        "page_count": 30
+      }
+    ],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "medium",
+    "risks": ["interface_compatibility"],
+    "triggered_rules": ["interface_review_required"],
+    "next_steps": ["Verify interface candidate compatibility"]
+  }
+}

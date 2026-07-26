@@ -1,0 +1,53 @@
+{
+  "input": {
+    "schema_version": "1.0",
+    "snapshot_fingerprint": "sha256:fee9c3302af04390c5fc14b5b890a7afdc5dccf94a0ffad098c193909558b1eb",
+    "context_id": "context:000000000000000000000003",
+    "task_intent": "Review multiple component candidates.",
+    "reference_ids": ["file:datasheet-a", "file:datasheet-b"],
+    "source_types": ["DATASHEET", "DATASHEET"],
+    "datasheet_candidates": [
+      {
+        "candidate_semantics": "unverified",
+        "file_id": "file:datasheet-a",
+        "component_candidate": {
+          "semantics": "candidate",
+          "family": "ESP32",
+          "model": "ESP32-S3"
+        },
+        "interfaces": [],
+        "sections": []
+      },
+      {
+        "candidate_semantics": "unverified",
+        "file_id": "file:datasheet-b",
+        "component_candidate": {
+          "semantics": "candidate",
+          "family": "STM32",
+          "model": "STM32F103"
+        },
+        "interfaces": [],
+        "sections": []
+      }
+    ],
+    "file_summaries": [
+      {
+        "file_id": "file:datasheet-a",
+        "document_type": "PDF",
+        "page_count": 10
+      },
+      {
+        "file_id": "file:datasheet-b",
+        "document_type": "PDF",
+        "page_count": 20
+      }
+    ],
+    "vision_refs": []
+  },
+  "expected": {
+    "confidence": "medium",
+    "risks": ["component_identity"],
+    "triggered_rules": ["multiple_component_candidates"],
+    "next_steps": ["Confirm the target component identity"]
+  }
+}
