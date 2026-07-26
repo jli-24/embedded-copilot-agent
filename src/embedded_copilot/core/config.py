@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str | None = None
     ollama_require_tls: bool = False
+    vision_provider: Literal["unavailable", "ollama"] = "unavailable"
+    ollama_vision_base_url: str = "http://127.0.0.1:11434"
+    ollama_vision_model: str | None = None
+    ollama_vision_require_tls: bool = False
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":
