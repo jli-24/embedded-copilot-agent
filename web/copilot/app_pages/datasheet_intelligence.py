@@ -52,7 +52,7 @@ def render() -> None:
                 file_id=file_id,
                 instruction_summary=instruction_summary,
             )
-        component, interfaces, sections = _candidate_summary(
+        component_candidate, interfaces, sections = _candidate_summary(
             result,
             file_id=file_id,
         )
@@ -61,7 +61,7 @@ def render() -> None:
         return
 
     st.caption("Candidate semantics: unverified")
-    _show_component(component)
+    _show_component(component_candidate)
     _show_named_candidates(
         "Interface Candidates",
         interfaces,
@@ -95,7 +95,7 @@ def _candidate_summary(
     ):
         raise ExperienceApiError("Copilot API returned an invalid response.")
 
-    component = _component_candidate(summary.get("component_candidate"))
+    component_candidate = _component_candidate(summary.get("component_candidate"))
     interfaces = _named_candidates(
         summary.get("interface_candidates"),
         allowed=INTERFACE_NAMES,
@@ -105,22 +105,22 @@ def _candidate_summary(
         summary.get("section_candidates"),
         allowed=SECTION_NAMES,
     )
-    return component, interfaces, sections
+    return component_candidate, interfaces, sections
 
 
 def _component_candidate(value: object) -> JsonObject | None:
     if value is None:
         return None
-    component = object_value(value)
-    family = component.get("family")
-    model = component.get("model")
+    component_candidate = object_value(value)
+    family = component_candidate.get("family")
+    model = component_candidate.get("model")
     if (
-        component.get("semantics") != "candidate"
+        component_candidate.get("semantics") != "candidate"
         or family not in COMPONENT_FAMILIES
         or (model is not None and not text_value(model, fallback=""))
     ):
         raise ExperienceApiError("Copilot API returned an invalid response.")
-    return component
+    return component_candidate
 
 
 def _candidate_items(value: object) -> tuple[JsonObject, ...]:
@@ -155,13 +155,13 @@ def _named_candidates(
     return names
 
 
-def _show_component(component: JsonObject | None) -> None:
+def _show_component(component_candidate: JsonObject | None) -> None:
     st.subheader("Component Candidate")
-    if component is None:
+    if component_candidate is None:
         st.info("No component candidate detected.")
         return
-    family = text_value(component.get("family"), fallback="")
-    model = text_value(component.get("model"), fallback="")
+    family = text_value(component_candidate.get("family"), fallback="")
+    model = text_value(component_candidate.get("model"), fallback="")
     label = f"{family} / {model}" if model else family
     st.write(f"{label} (candidate)")
 
