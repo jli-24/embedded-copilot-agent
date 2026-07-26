@@ -10,7 +10,7 @@ TARGETS = (
     PACKAGE_ROOT / "intelligence",
     PACKAGE_ROOT / "multimodal" / "context.py",
     PACKAGE_ROOT / "vision",
-    PACKAGE_ROOT / "file_intelligence",
+    PACKAGE_ROOT / "file_runtime",
     PACKAGE_ROOT / "datasheet" / "intelligence",
     PACKAGE_ROOT / "conversation",
     PACKAGE_ROOT / "api" / "copilot_models.py",
