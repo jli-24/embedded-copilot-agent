@@ -117,14 +117,14 @@ class CopilotExperienceClient:
         session_id: str,
         *,
         reference_id: str,
-        message_summary: str,
+        instruction_summary: str,
     ) -> JsonObject:
         return self._request(
             "POST",
             f"{self._session_url(session_id)}/vision",
             json={
                 "reference_id": reference_id,
-                "message_summary": message_summary,
+                "instruction_summary": instruction_summary,
             },
         )
 

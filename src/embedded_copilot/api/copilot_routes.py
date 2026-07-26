@@ -73,6 +73,7 @@ class WorkspaceService(Protocol):
         trace_id: str,
     ) -> AttachmentBinding: ...
 
+
 def get_workspace_service(request: Request) -> WorkspaceService | None:
     return request.app.state.workspace_service
 

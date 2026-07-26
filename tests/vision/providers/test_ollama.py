@@ -53,9 +53,7 @@ def test_ollama_provider_sends_metadata_only_non_streaming_request() -> None:
         )
     )
 
-    assert result.summary == (
-        "The metadata suggests an engineer review is needed."
-    )
+    assert result.summary == ("The metadata suggests an engineer review is needed.")
     assert set(result.metadata) == {"cached", "finish_reason", "latency_ms"}
     assert result.metadata["cached"] is False
     assert result.metadata["finish_reason"] == "stop"

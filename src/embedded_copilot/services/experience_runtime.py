@@ -37,7 +37,6 @@ from embedded_copilot.multimodal.context import (
     ProcessLocalAttachmentBindingRepository,
 )
 from embedded_copilot.multimodal.models import (
-    MultimodalInput,
     MultimodalInputType,
 )
 from embedded_copilot.schemas.knowledge_trace import KnowledgeTrace
@@ -172,6 +171,7 @@ class ProcessLocalWorkspaceService:
             binding.session_id,
             binding.input.reference_id,
         )
+
 
 @dataclass(frozen=True)
 class ExperienceRuntime:

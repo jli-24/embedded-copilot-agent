@@ -14,7 +14,6 @@ from embedded_copilot.vision_runtime import (
     VisionRequest,
     VisionResponse,
     VisionRuntime,
-    create_vision_runtime,
 )
 
 
@@ -32,7 +31,9 @@ def _request() -> VisionRequest:
     )
 
 
-def test_vision_request_is_frozen_and_rejects_payload_or_infrastructure_fields() -> None:
+def test_vision_request_is_frozen_and_rejects_payload_or_infrastructure_fields() -> (
+    None
+):
     request = _request()
 
     assert tuple(type(request).model_fields) == (

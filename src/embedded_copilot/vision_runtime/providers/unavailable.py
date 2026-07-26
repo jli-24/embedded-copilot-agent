@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from embedded_copilot.vision_runtime.contracts import VisionRequest
+from embedded_copilot.vision_runtime.contracts import (
+    VisionProviderUnavailable,
+    VisionRequest,
+)
 from embedded_copilot.vision_runtime.providers.base import (
     ProviderVisionResponse,
     VisionCapability,
-    VisionProviderUnavailable,
 )
 
 _UNAVAILABLE_MESSAGE = "vision provider is unavailable"

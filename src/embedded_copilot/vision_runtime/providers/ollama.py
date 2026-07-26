@@ -7,12 +7,14 @@ from typing import Any
 
 import httpx
 
-from embedded_copilot.vision_runtime.contracts import VisionRequest
+from embedded_copilot.vision_runtime.contracts import (
+    VisionProviderTimeout,
+    VisionProviderUnavailable,
+    VisionRequest,
+)
 from embedded_copilot.vision_runtime.providers.base import (
     ProviderVisionResponse,
     VisionCapability,
-    VisionProviderTimeout,
-    VisionProviderUnavailable,
 )
 
 _UNAVAILABLE_MESSAGE = "vision provider is unavailable"

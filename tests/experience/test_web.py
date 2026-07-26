@@ -16,10 +16,8 @@ ROOT = Path(__file__).parents[2]
 ALLOWED_SESSION_STATE_KEYS = {
     "session_id",
     "answer_summary",
-    "attachment_receipt",
     "handoff",
     "review_receipt",
-    "vision_suggestion",
 }
 
 
@@ -240,7 +238,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         client.analyze_vision(
             "session:1",
             reference_id="image:1",
-            message_summary="Review the referenced schematic.",
+            instruction_summary="Review the referenced schematic.",
         )
         client.record_review(
             "session:1",
@@ -266,6 +264,11 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("GET", "/api/v1/copilot/models/status"),
     ]
     review_payload = json.loads(requests[-2].content)
+    vision_payload = json.loads(requests[6].content)
+    assert vision_payload == {
+        "reference_id": "image:1",
+        "instruction_summary": "Review the referenced schematic.",
+    }
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
     assert "source" not in review_payload
@@ -414,42 +417,100 @@ def test_upload_page_registers_references_without_file_bytes() -> None:
         assert prohibited not in source
 
 
-def test_multimodal_state_is_not_reused_across_sessions() -> None:
+def test_vision_page_renders_transient_review_required_suggestion() -> None:
     app = AppTest.from_string(
         """
 import streamlit as st
-from web.copilot.state import (
-    attachment_receipt,
-    store_attachment_receipt,
-    store_vision_suggestion,
-    vision_suggestion,
-)
+import web.copilot.app_pages.vision as vision_page
 
-store_attachment_receipt(
-    "session:1",
-    {
-        "session_id": "session:1",
-        "reference_id": "image:1",
-        "type": "IMAGE",
-        "basename": "schematic.png",
-        "summary": "Image reference.",
-        "size_bytes": 1,
-        "status": "REFERENCED",
-        "created_at": "2026-07-26T08:01:00Z",
-    },
-)
-store_vision_suggestion(
-    "session:1",
-    {"type": "reasoning_suggestion", "summary": "Review required."},
-)
-st.write(attachment_receipt("session:2") or "No cross-session attachment.")
-st.write(vision_suggestion("session:2") or "No cross-session suggestion.")
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_vision(
+        self,
+        session_id,
+        *,
+        reference_id,
+        instruction_summary,
+    ):
+        return {
+            "type": "reasoning_suggestion",
+            "summary": "Reference metadata requires engineer review.",
+            "review_required": True,
+        }
+
+vision_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+vision_page.render()
 """,
     )
     app.run(timeout=15)
+    app.text_input[1].input("image:1")
+    app.text_area[0].input("Review the reference metadata.")
+    app.button[0].click().run(timeout=15)
 
     assert not app.exception
-    assert tuple(item.value for item in app.markdown) == (
-        "No cross-session attachment.",
-        "No cross-session suggestion.",
+    assert tuple(item.value for item in app.subheader) == ("AI Suggestion",)
+    assert "Reference metadata requires engineer review." in tuple(
+        item.value for item in app.markdown
     )
+    assert tuple(item.value for item in app.warning) == (
+        "This output is not Engineering Evidence. Engineer validation required.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}
+
+
+def test_upload_page_renders_transient_reference_receipt() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+import web.copilot.app_pages.upload as upload_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def bind_attachment(self, session_id, **kwargs):
+        return {
+            "session_id": session_id,
+            "reference_id": kwargs["reference_id"],
+            "type": kwargs["input_type"],
+            "basename": kwargs["basename"],
+            "summary": kwargs["summary"],
+            "size_bytes": kwargs["size_bytes"],
+            "status": "REFERENCED",
+            "created_at": kwargs["created_at"],
+        }
+
+upload_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+upload_page.render()
+""",
+    )
+    app.run(timeout=15)
+    app.text_input[1].input("image:1")
+    app.text_input[2].input("schematic.png")
+    app.text_area[0].input("Registered image reference metadata.")
+    app.number_input[0].set_value(1024)
+    app.button[0].click().run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.success) == (
+        "Reference metadata registered.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}

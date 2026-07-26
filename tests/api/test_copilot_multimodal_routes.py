@@ -11,7 +11,6 @@ from embedded_copilot.conversation.models import ConversationMessage, Conversati
 from embedded_copilot.copilot.workspace import ProjectWorkspace
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
-    AttachmentBindingConflict,
     AttachmentBindingNotFound,
 )
 from embedded_copilot.schemas.api import ChatResponse
@@ -57,6 +56,7 @@ class _WorkspaceService:
     ) -> AttachmentBinding:
         self.binding = binding
         return binding
+
 
 class _VisionPort:
     def __init__(self, *, outcome: str = "success") -> None:

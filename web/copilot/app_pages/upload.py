@@ -6,11 +6,7 @@ import streamlit as st
 
 from web.copilot.app_pages.shared import api_client, show_api_error
 from web.copilot.client import ExperienceApiError
-from web.copilot.state import (
-    active_session_id,
-    attachment_receipt,
-    store_attachment_receipt,
-)
+from web.copilot.state import active_session_id
 
 
 def render() -> None:
@@ -20,11 +16,6 @@ def render() -> None:
     if not session_id:
         st.info("Enter a session ID to register a reference.")
         return
-
-    existing = attachment_receipt(session_id)
-    if existing is not None:
-        st.success("Reference metadata registered.")
-        st.write(existing)
 
     with st.form("attachment_reference_form"):
         reference_id = st.text_input(
@@ -61,8 +52,8 @@ def render() -> None:
                 size_bytes=int(size_bytes),
                 created_at=datetime.now(timezone.utc).isoformat(),
             )
-        store_attachment_receipt(session_id, receipt)
     except (ExperienceApiError, ValueError) as error:
         show_api_error(ExperienceApiError(str(error)))
         return
-    st.rerun()
+    st.success("Reference metadata registered.")
+    st.write(receipt)

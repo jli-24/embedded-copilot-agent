@@ -1,9 +1,11 @@
+from embedded_copilot.vision_runtime.contracts import (
+    VisionProviderTimeout,
+    VisionProviderUnavailable,
+)
 from embedded_copilot.vision_runtime.providers.base import (
     ProviderVisionResponse,
     VisionCapability,
     VisionProvider,
-    VisionProviderTimeout,
-    VisionProviderUnavailable,
 )
 from embedded_copilot.vision_runtime.providers.ollama import OllamaVisionProvider
 from embedded_copilot.vision_runtime.providers.unavailable import (

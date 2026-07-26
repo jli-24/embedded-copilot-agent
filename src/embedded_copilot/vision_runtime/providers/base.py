@@ -9,11 +9,7 @@ from pydantic import Field, field_serializer, field_validator
 
 from embedded_copilot.intelligence._validation import safe_text
 from embedded_copilot.intelligence.models import IntelligenceContractModel
-from embedded_copilot.vision_runtime.contracts import (
-    VisionProviderTimeout,
-    VisionProviderUnavailable,
-    VisionRequest,
-)
+from embedded_copilot.vision_runtime.contracts import VisionRequest
 
 VisionMetadataValue: TypeAlias = str | float | bool
 _ALLOWED_METADATA = frozenset({"cached", "finish_reason", "latency_ms"})

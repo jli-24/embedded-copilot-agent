@@ -53,10 +53,8 @@ FORBIDDEN_SESSION_KEYS = {
 ALLOWED_SESSION_KEYS = {
     "session_id",
     "answer_summary",
-    "attachment_receipt",
     "handoff",
     "review_receipt",
-    "vision_suggestion",
 }
 
 
