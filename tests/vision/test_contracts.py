@@ -14,6 +14,7 @@ from embedded_copilot.vision_runtime import (
     VisionRequest,
     VisionResponse,
     VisionRuntime,
+    create_vision_runtime,
 )
 
 
@@ -104,4 +105,5 @@ def test_vision_runtime_package_exports_only_stable_contracts_and_facade() -> No
         "VisionRequest",
         "VisionResponse",
         "VisionRuntime",
+        "create_vision_runtime",
     ]

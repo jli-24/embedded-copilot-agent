@@ -6,6 +6,7 @@ from embedded_copilot.vision_runtime.contracts import (
     VisionRequest,
     VisionResponse,
 )
+from embedded_copilot.vision_runtime.composition import create_vision_runtime
 from embedded_copilot.vision_runtime.facade import VisionRuntime
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "VisionRequest",
     "VisionResponse",
     "VisionRuntime",
+    "create_vision_runtime",
 ]

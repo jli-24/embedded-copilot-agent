@@ -3,22 +3,27 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 
+import httpx
 import pytest
-from pydantic import ValidationError
 
-from embedded_copilot.intelligence.gateway import ModelGateway
-from embedded_copilot.intelligence.providers.mock import DeterministicMockProvider
+from embedded_copilot.core.config import Settings
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
+    AttachmentBindingNotFound,
     ProcessLocalAttachmentBindingRepository,
 )
 from embedded_copilot.multimodal.models import (
     MultimodalInput,
     MultimodalInputType,
 )
-from embedded_copilot.vision.adapter import GatewayVisionAdapter
-from embedded_copilot.vision.models import VisionSuggestion
-from embedded_copilot.vision.service import VisionService
+from embedded_copilot.vision_runtime import (
+    ImageType,
+    VisionRequest,
+    VisionRuntime,
+    create_vision_runtime,
+)
+from embedded_copilot.vision_runtime.gateway import VisionReferenceConflict
+from embedded_copilot.vision_runtime.providers import VisionProviderUnavailable
 
 CREATED = datetime(2026, 7, 26, 9, 0, tzinfo=timezone.utc)
 
@@ -43,52 +48,92 @@ def _repository(
     return repository
 
 
-def test_vision_service_returns_source_bound_reasoning_suggestion() -> None:
-    provider = DeterministicMockProvider(
-        response_text="The image may contain an MCU region; confirm during review."
-    )
-    service = VisionService(
-        repository=_repository(),
-        adapter=GatewayVisionAdapter(ModelGateway((provider,))),
-    )
-
-    suggestion = asyncio.run(
-        service.analyze(
-            session_id="session:1",
-            reference_id="reference:1",
-            message_summary="Review the referenced schematic image.",
-        )
+def _request(session_id: str = "session:1") -> VisionRequest:
+    return VisionRequest(
+        session_id=session_id,
+        reference_id="reference:1",
+        image_type=ImageType.UNKNOWN,
+        instruction_summary="Review the referenced metadata.",
     )
 
-    assert suggestion.output_type == "reasoning_suggestion"
-    assert suggestion.source_reference == "reference:1"
-    assert suggestion.confidence == 0.0
-    assert "confirm" in suggestion.summary
 
-
-def test_vision_service_rejects_non_image_reference() -> None:
-    service = VisionService(
-        repository=_repository(MultimodalInputType.FILE),
-        adapter=GatewayVisionAdapter(ModelGateway((DeterministicMockProvider(),))),
-    )
-
-    with pytest.raises(ValueError, match="image reference"):
-        asyncio.run(
-            service.analyze(
-                session_id="session:1",
-                reference_id="reference:1",
-                message_summary="Review the reference.",
-            )
+def test_factory_composes_reference_bound_vision_port_without_leaking_internals() -> (
+    None
+):
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "response": "The reference metadata requires engineer review.",
+                "done_reason": "stop",
+            },
         )
 
+    runtime = create_vision_runtime(
+        Settings(
+            _env_file=None,
+            vision_provider="ollama",
+            ollama_vision_model="deployment-selected-model",
+        ),
+        _repository(),
+        transport=httpx.MockTransport(respond),
+    )
 
-def test_vision_suggestion_rejects_engineering_fact_fields() -> None:
-    with pytest.raises(ValidationError):
-        VisionSuggestion.model_validate(
-            {
-                "summary": "This remains a suggestion.",
-                "confidence": 0.2,
-                "source_reference": "reference:1",
-                "gpio": "GPIO4",
-            }
-        )
+    response = asyncio.run(runtime.vision_port().analyze(_request()))
+
+    assert isinstance(runtime, VisionRuntime)
+    assert response.model_dump(mode="json") == {
+        "output_type": "reasoning_suggestion",
+        "summary": "The reference metadata requires engineer review.",
+        "review_required": True,
+    }
+    for forbidden in (
+        "provider",
+        "router",
+        "registry",
+        "repository",
+        "configuration",
+        "settings",
+        "config",
+        "health",
+    ):
+        assert not hasattr(runtime, forbidden)
+        assert not hasattr(runtime.vision_port(), forbidden)
+
+
+def test_vision_port_rejects_cross_session_reference_access() -> None:
+    runtime = create_vision_runtime(
+        Settings(_env_file=None),
+        _repository(),
+    )
+
+    with pytest.raises(AttachmentBindingNotFound):
+        asyncio.run(runtime.vision_port().analyze(_request("session:2")))
+
+
+def test_vision_port_rejects_non_image_reference_before_provider_selection() -> None:
+    runtime = create_vision_runtime(
+        Settings(_env_file=None),
+        _repository(MultimodalInputType.FILE),
+    )
+
+    with pytest.raises(
+        VisionReferenceConflict,
+        match=r"^vision reference type is invalid$",
+    ):
+        asyncio.run(runtime.vision_port().analyze(_request()))
+
+
+def test_default_runtime_reports_provider_unavailable_after_reference_resolution() -> (
+    None
+):
+    runtime = create_vision_runtime(
+        Settings(_env_file=None),
+        _repository(),
+    )
+
+    with pytest.raises(
+        VisionProviderUnavailable,
+        match=r"^vision provider is unavailable$",
+    ):
+        asyncio.run(runtime.vision_port().analyze(_request()))
