@@ -19,6 +19,9 @@ from embedded_copilot.datasheet_runtime.extractors.component import (
 from embedded_copilot.datasheet_runtime.extractors.electrical import (
     extract_electrical_candidates,
 )
+from embedded_copilot.datasheet_runtime.extractors.interface import (
+    extract_interface_candidates,
+)
 from embedded_copilot.datasheet_runtime.facade import DatasheetRuntime
 from embedded_copilot.datasheet_runtime.parser.pdf_structure import (
     PDFStructureParser,
@@ -52,6 +55,7 @@ class _DatasheetExtractor:
         return DatasheetSummary(
             file_id=reference.file_id,
             component_candidate=extract_component_candidate(structure),
+            interface_candidates=extract_interface_candidates(structure),
             electrical_candidates=extract_electrical_candidates(structure),
             section_candidates=detect_sections(structure),
         )

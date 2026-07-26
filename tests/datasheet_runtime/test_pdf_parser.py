@@ -92,6 +92,7 @@ def _request() -> DatasheetRequest:
 def test_pdf_runtime_returns_only_candidate_dtos() -> None:
     payload = _pdf(
         "STM32F103C8T6 Datasheet",
+        "Communication interfaces: SPI, UART and I2C",
         "1 Electrical Characteristics",
         "Operating voltage range: 2000 mV to 3600 mV",
         "Operating temperature: -40 C to 85 C",
@@ -116,6 +117,11 @@ def test_pdf_runtime_returns_only_candidate_dtos() -> None:
             "family": "STM32",
             "model": "STM32F103C8T6",
         },
+        interface_candidates=(
+            {"semantics": "candidate", "name": "UART"},
+            {"semantics": "candidate", "name": "SPI"},
+            {"semantics": "candidate", "name": "I2C"},
+        ),
         electrical_candidates=(
             {
                 "semantics": "candidate",
