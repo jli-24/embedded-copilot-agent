@@ -20,6 +20,13 @@ from embedded_copilot.conversation.repository import (
 )
 from embedded_copilot.conversation.router import IntentRouter
 from embedded_copilot.conversation.service import ConversationService
+from embedded_copilot.context_runtime.contracts import (
+    ContextImageType,
+    EngineeringContextRequest,
+    EngineeringContextResponse,
+    EngineeringContextSummary,
+    VisionContext,
+)
 from embedded_copilot.copilot.session import create_session
 from embedded_copilot.copilot.workspace import create_workspace
 from embedded_copilot.copilot.models import (
@@ -78,10 +85,39 @@ class _ReasoningPort:
         return self.output
 
 
+class _ContextPort:
+    def __init__(self) -> None:
+        self.calls: list[EngineeringContextRequest] = []
+        self.responses: list[EngineeringContextResponse] = []
+
+    async def compose(
+        self,
+        request: EngineeringContextRequest,
+    ) -> EngineeringContextResponse:
+        self.calls.append(request)
+        response = EngineeringContextResponse(
+            context_summary=EngineeringContextSummary(
+                context_id="context:0123456789abcdef01234567",
+                task_intent=request.task_intent,
+                vision=tuple(
+                    VisionContext(
+                        reference_id=reference_id,
+                        image_type=ContextImageType.UNKNOWN,
+                    )
+                    for reference_id in request.reference_ids
+                    if reference_id.startswith("image:")
+                ),
+            )
+        )
+        self.responses.append(response)
+        return response
+
+
 def _service(
     repository: ProcessLocalConversationRepository,
     reasoning: _ReasoningPort,
     attachments: ProcessLocalAttachmentBindingRepository | None = None,
+    context_port: _ContextPort | None = None,
 ) -> ConversationService:
     return ConversationService(
         repository=repository,
@@ -89,6 +125,7 @@ def _service(
         intent_router=IntentRouter(),
         reasoning=reasoning,
         attachment_repository=attachments,
+        context_port=context_port or _ContextPort(),
     )
 
 
@@ -114,9 +151,10 @@ def test_artifact_change_creates_handoff_without_mutation_or_model_call() -> Non
     original = _workspace()
     repository.add(original)
     reasoning = _ReasoningPort()
+    context_port = _ContextPort()
 
     turn = asyncio.run(
-        _service(repository, reasoning).send_message(
+        _service(repository, reasoning, context_port=context_port).send_message(
             ConversationMessage(
                 session_id="session:1",
                 message_id="message:1",
@@ -130,6 +168,7 @@ def test_artifact_change_creates_handoff_without_mutation_or_model_call() -> Non
     assert turn.intent is ConversationIntent.ARTIFACT_CHANGE
     assert turn.handoff == "engineering_agent_review"
     assert reasoning.calls == []
+    assert context_port.calls == []
     assert updated.session.artifact_ids == original.session.artifact_ids
     assert updated.session.decision_ids == original.session.decision_ids
     assert updated.session.approval_status == original.session.approval_status
@@ -141,8 +180,9 @@ def test_reasoning_output_expiration() -> None:
     repository.add(_workspace())
     reasoning = _ReasoningPort()
 
+    context_port = _ContextPort()
     turn = asyncio.run(
-        _service(repository, reasoning).send_message(
+        _service(repository, reasoning, context_port=context_port).send_message(
             ConversationMessage(
                 session_id="session:1",
                 message_id="message:1",
@@ -157,6 +197,7 @@ def test_reasoning_output_expiration() -> None:
     assert not repository.contains(reasoning.output.reasoning_chain)
     assert not repository.contains(reasoning.output.temporary_context)
     assert not repository.contains(captured_context)
+    assert not repository.contains(context_port.responses[0])
     assert turn.answer_summary == (
         "Candidate explanation requiring engineering validation."
     )
@@ -239,9 +280,15 @@ def test_image_reference_routes_to_vision_with_session_bound_context() -> None:
         )
     )
     reasoning = _ReasoningPort()
+    context_port = _ContextPort()
 
     turn = asyncio.run(
-        _service(repository, reasoning, attachments).send_message(
+        _service(
+            repository,
+            reasoning,
+            attachments,
+            context_port,
+        ).send_message(
             ConversationMessage(
                 session_id="session:1",
                 message_id="message:vision",
@@ -256,7 +303,15 @@ def test_image_reference_routes_to_vision_with_session_bound_context() -> None:
     assert turn.intent is ConversationIntent.VISION_ANALYSIS
     assert task_intent == "VISION_ANALYSIS"
     assert message_summary == "Review this ESP32 schematic image."
-    assert "ESP32 schematic image reference." in context_summaries
+    assert "Task intent: VISION_ANALYSIS." in context_summaries
+    assert "Vision reference image:1: unknown." in context_summaries
+    assert context_port.calls == [
+        EngineeringContextRequest(
+            session_id="session:1",
+            task_intent="VISION_ANALYSIS",
+            reference_ids=("image:1",),
+        )
+    ]
     assert repository.get("session:1").messages[0].references == ("image:1",)
 
 

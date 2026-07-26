@@ -17,6 +17,7 @@ from embedded_copilot.context_runtime.contracts import (
     InterfaceContextCandidate,
     SectionContextCandidate,
     VisionContext,
+    EngineeringContextResponse,
 )
 from embedded_copilot.context_runtime.exceptions import (
     EngineeringContextConflict,
@@ -99,6 +100,14 @@ class CopilotContextReferenceResolver:
                 )
             )
         return tuple(references)
+
+
+class UnavailableEngineeringContextPort:
+    async def compose(
+        self,
+        request: EngineeringContextRequest,
+    ) -> EngineeringContextResponse:
+        raise EngineeringContextUnavailable()
 
 
 class CopilotFileContextSource:

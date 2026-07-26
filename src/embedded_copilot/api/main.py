@@ -21,6 +21,7 @@ from embedded_copilot.api.context_adapters import (
     CopilotDatasheetContextSource,
     CopilotFileContextSource,
     CopilotVisionContextSource,
+    UnavailableEngineeringContextPort,
 )
 from embedded_copilot.api.experience_routes import (
     ExperienceService,
@@ -43,6 +44,9 @@ from embedded_copilot.file_runtime import (
     create_file_runtime,
 )
 from embedded_copilot.model_runtime import create_model_runtime
+from embedded_copilot.multimodal.context import (
+    ProcessLocalAttachmentBindingRepository,
+)
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
@@ -98,44 +102,31 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
-        default_experience_runtime = None
-        if isinstance(workspace_service, _UnsetService):
-            default_experience_runtime = build_experience_runtime(
-                reasoning=model_runtime.reasoning_port()
-            )
-            active_workspace_service: WorkspaceService | None = (
-                default_experience_runtime.workspace_service
-            )
-        else:
-            active_workspace_service = workspace_service
-        if isinstance(experience_service, _UnsetService):
-            active_experience_service: ExperienceService | None = (
-                default_experience_runtime.experience_service
-                if default_experience_runtime is not None
-                else None
-            )
-        else:
-            active_experience_service = experience_service
+        default_attachment_repository = (
+            ProcessLocalAttachmentBindingRepository()
+            if isinstance(workspace_service, _UnsetService)
+            else None
+        )
         if isinstance(vision_port, _UnsetService):
             active_vision_port: VisionPort | None = (
                 create_vision_runtime(
                     active_settings,
-                    default_experience_runtime.attachment_repository,
+                    default_attachment_repository,
                 ).vision_port()
-                if default_experience_runtime is not None
+                if default_attachment_repository is not None
                 else None
             )
         else:
             active_vision_port = vision_port
         default_file_runtime = None
-        if default_experience_runtime is not None and (
+        if default_attachment_repository is not None and (
             isinstance(file_port, _UnsetService)
             or isinstance(datasheet_port, _UnsetService)
         ):
             default_file_runtime = create_file_runtime(
                 active_settings,
                 CopilotFileReferenceCatalog(
-                    default_experience_runtime.attachment_repository,
+                    default_attachment_repository,
                     file_reference_paths or {},
                 ),
             )
@@ -166,10 +157,10 @@ def create_app(
                     ),
                     vision_port=CopilotVisionContextSource(active_vision_port),
                     reference_resolver=CopilotContextReferenceResolver(
-                        default_experience_runtime.attachment_repository
+                        default_attachment_repository
                     ),
                 ).context_port()
-                if default_experience_runtime is not None
+                if default_attachment_repository is not None
                 and active_file_port is not None
                 and active_datasheet_port is not None
                 and active_vision_port is not None
@@ -177,6 +168,32 @@ def create_app(
             )
         else:
             active_context_port = context_port
+        default_experience_runtime = None
+        if isinstance(workspace_service, _UnsetService):
+            if default_attachment_repository is None:
+                raise RuntimeError("attachment repository composition failed")
+            default_experience_runtime = build_experience_runtime(
+                reasoning=model_runtime.reasoning_port(),
+                context_port=(
+                    active_context_port
+                    if active_context_port is not None
+                    else UnavailableEngineeringContextPort()
+                ),
+                attachment_repository=default_attachment_repository,
+            )
+            active_workspace_service: WorkspaceService | None = (
+                default_experience_runtime.workspace_service
+            )
+        else:
+            active_workspace_service = workspace_service
+        if isinstance(experience_service, _UnsetService):
+            active_experience_service: ExperienceService | None = (
+                default_experience_runtime.experience_service
+                if default_experience_runtime is not None
+                else None
+            )
+        else:
+            active_experience_service = experience_service
         application.state.settings = active_settings
         application.state.model_status_port = model_runtime.status_port()
         application.state.vision_port = active_vision_port

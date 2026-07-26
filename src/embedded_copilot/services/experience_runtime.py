@@ -12,6 +12,7 @@ from embedded_copilot.conversation.repository import (
 )
 from embedded_copilot.conversation.router import IntentRouter
 from embedded_copilot.conversation.service import ConversationService
+from embedded_copilot.context_runtime.contracts import EngineeringContextPort
 from embedded_copilot.copilot.models import (
     WorkspaceFileSource,
     WorkspaceFileStatus,
@@ -180,20 +181,28 @@ class ExperienceRuntime:
     attachment_repository: ProcessLocalAttachmentBindingRepository
 
 
-def build_experience_runtime(*, reasoning: ReasoningPort) -> ExperienceRuntime:
+def build_experience_runtime(
+    *,
+    reasoning: ReasoningPort,
+    context_port: EngineeringContextPort,
+    attachment_repository: ProcessLocalAttachmentBindingRepository | None = None,
+) -> ExperienceRuntime:
     repository = ProcessLocalConversationRepository()
-    attachment_repository = ProcessLocalAttachmentBindingRepository()
+    active_attachment_repository = (
+        attachment_repository or ProcessLocalAttachmentBindingRepository()
+    )
     conversation_service = ConversationService(
         repository=repository,
         context_resolver=ContextResolver(),
         intent_router=IntentRouter(),
         reasoning=reasoning,
-        attachment_repository=attachment_repository,
+        context_port=context_port,
+        attachment_repository=active_attachment_repository,
     )
     workspace_service = ProcessLocalWorkspaceService(
         repository=repository,
         conversation_service=conversation_service,
-        attachment_repository=attachment_repository,
+        attachment_repository=active_attachment_repository,
     )
     experience_service = ProcessLocalExperienceService(
         workspace_port=_WorkspaceProjectionPort(repository),
@@ -207,5 +216,5 @@ def build_experience_runtime(*, reasoning: ReasoningPort) -> ExperienceRuntime:
     return ExperienceRuntime(
         workspace_service=workspace_service,
         experience_service=experience_service,
-        attachment_repository=attachment_repository,
+        attachment_repository=active_attachment_repository,
     )
