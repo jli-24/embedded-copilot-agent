@@ -224,3 +224,39 @@ def test_backend_has_no_reverse_dependency_on_experience_ui() -> None:
                 ), path
             elif isinstance(node, ast.ImportFrom):
                 assert not (node.module or "").startswith("web.copilot"), path
+
+
+def test_reasoning_page_only_uses_the_copilot_client_boundary() -> None:
+    path = WEB_ROOT / "app_pages" / "reasoning_intelligence.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    forbidden_imports = {
+        "embedded_copilot",
+        "pathlib",
+        "os",
+        "io",
+        "pypdf",
+        "fitz",
+    }
+    forbidden_calls = {
+        "open",
+        "file_uploader",
+        "download_button",
+        "write_text",
+        "write_bytes",
+        "read_text",
+        "read_bytes",
+        "run",
+        "execute",
+    }
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            assert all(
+                alias.name.split(".", maxsplit=1)[0] not in forbidden_imports
+                for alias in node.names
+            ), path
+        elif isinstance(node, ast.ImportFrom):
+            root = (node.module or "").split(".", maxsplit=1)[0]
+            assert root not in forbidden_imports, path
+        elif isinstance(node, ast.Call):
+            assert _name(node.func) not in forbidden_calls, path

@@ -30,6 +30,7 @@ from embedded_copilot.api.experience_routes import (
 from embedded_copilot.api.file_reference_catalog import (
     CopilotFileReferenceCatalog,
 )
+from embedded_copilot.api.reasoning_adapters import ContextBackedReasoningService
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
 from embedded_copilot.datasheet_runtime import (
     DatasheetIntelligencePort,
@@ -44,6 +45,10 @@ from embedded_copilot.file_runtime import (
     create_file_runtime,
 )
 from embedded_copilot.model_runtime import create_model_runtime
+from embedded_copilot.reasoning_runtime import (
+    ReasoningPort,
+    create_reasoning_runtime,
+)
 from embedded_copilot.multimodal.context import (
     ProcessLocalAttachmentBindingRepository,
 )
@@ -95,6 +100,7 @@ def create_app(
     file_port: FileIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
     datasheet_port: DatasheetIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
     context_port: EngineeringContextPort | None | _UnsetService = _UNSET_SERVICE,
+    reasoning_port: ReasoningPort | None | _UnsetService = _UNSET_SERVICE,
     file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
@@ -166,6 +172,22 @@ def create_app(
             )
         else:
             active_context_port = context_port
+        if isinstance(reasoning_port, _UnsetService):
+            active_reasoning_port: ReasoningPort | None = (
+                model_runtime.enhance_reasoning_port(
+                    create_reasoning_runtime().reasoning_port()
+                )
+                if active_context_port is not None
+                else None
+            )
+        else:
+            active_reasoning_port = reasoning_port
+        active_reasoning_service = None
+        if active_context_port is not None and active_reasoning_port is not None:
+            active_reasoning_service = ContextBackedReasoningService(
+                active_context_port,
+                active_reasoning_port,
+            )
         default_experience_runtime = None
         if isinstance(workspace_service, _UnsetService):
             if default_attachment_repository is None:
@@ -198,6 +220,8 @@ def create_app(
         application.state.file_port = active_file_port
         application.state.datasheet_port = active_datasheet_port
         application.state.context_port = active_context_port
+        application.state.reasoning_port = active_reasoning_port
+        application.state.reasoning_service = active_reasoning_service
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:
@@ -239,6 +263,14 @@ def create_app(
                 status_code=422,
                 content={
                     "error": "context_unavailable",
+                    "trace_id": request.state.trace_id,
+                },
+            )
+        if request.url.path.endswith("/reasoning"):
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": "reasoning_unavailable",
                     "trace_id": request.state.trace_id,
                 },
             )

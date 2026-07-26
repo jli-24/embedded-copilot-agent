@@ -9,7 +9,7 @@ from streamlit.testing.v1 import AppTest
 
 from web.copilot.app_pages.blueprint import graphviz_source
 from web.copilot.app_pages.files import DISPLAY_COLUMNS
-from web.copilot.client import CopilotExperienceClient
+from web.copilot.client import CopilotExperienceClient, ExperienceApiError
 from web.copilot.navigation import PAGE_TITLES
 
 ROOT = Path(__file__).parents[2]
@@ -38,6 +38,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         "File Intelligence",
         "Datasheet Intelligence",
         "Engineering Context",
+        "Reasoning Intelligence",
         "Progress",
         "Review",
         "Model Status",
@@ -57,6 +58,7 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         ("file_intelligence", "File Intelligence"),
         ("datasheet_intelligence", "Datasheet Intelligence"),
         ("engineering_context", "Engineering Context"),
+        ("reasoning_intelligence", "Reasoning Intelligence"),
         ("progress", "Progress"),
         ("review", "Review"),
         ("model_status", "Model Status"),
@@ -261,6 +263,12 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             task_intent="Review referenced embedded context.",
             reference_ids=("file:datasheet-1", "image:1"),
         )
+        client.analyze_reasoning(
+            "session:1",
+            task_intent="Review referenced embedded context.",
+            context_id="context:0123456789abcdef01234567",
+            reference_ids=("file:datasheet-1", "image:1"),
+        )
         client.record_review(
             "session:1",
             intent_id="review:1",
@@ -284,6 +292,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("POST", "/api/v1/copilot/sessions/session:1/files/analyze"),
         ("POST", "/api/v1/copilot/sessions/session:1/datasheets/analyze"),
         ("POST", "/api/v1/copilot/sessions/session:1/context"),
+        ("POST", "/api/v1/copilot/sessions/session:1/reasoning"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
         ("GET", "/api/v1/copilot/models/status"),
     ]
@@ -292,6 +301,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
     file_payload = json.loads(requests[7].content)
     datasheet_payload = json.loads(requests[8].content)
     context_payload = json.loads(requests[9].content)
+    reasoning_payload = json.loads(requests[10].content)
     assert vision_payload == {
         "reference_id": "image:1",
         "instruction_summary": "Review the referenced schematic.",
@@ -308,12 +318,59 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         "task_intent": "Review referenced embedded context.",
         "reference_ids": ["file:datasheet-1", "image:1"],
     }
+    assert reasoning_payload == {
+        "task_intent": "Review referenced embedded context.",
+        "context_id": "context:0123456789abcdef01234567",
+        "reference_ids": ["file:datasheet-1", "image:1"],
+    }
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
     assert "source" not in review_payload
     assert not hasattr(client, "download")
     assert not hasattr(client, "open")
     assert not hasattr(client, "preview")
+    for capability in (
+        "write",
+        "patch",
+        "execute",
+        "generate_code",
+        "apply_patch",
+        "flash_firmware",
+        "control_vscode",
+    ):
+        assert not hasattr(client, capability)
+
+
+@pytest.mark.parametrize("status_code", (404, 503))
+def test_reasoning_client_maps_safe_api_failures(status_code: int) -> None:
+    def respond(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code,
+            json={
+                "error": "reasoning_unavailable",
+                "trace_id": "trace:private-provider-detail",
+            },
+        )
+
+    client = CopilotExperienceClient(
+        "http://testserver",
+        transport=httpx.MockTransport(respond),
+    )
+    try:
+        with pytest.raises(
+            ExperienceApiError,
+            match="Copilot API request failed",
+        ) as captured:
+            client.analyze_reasoning(
+                "session:1",
+                task_intent="Review referenced engineering context.",
+                context_id="context:0123456789abcdef01234567",
+                reference_ids=(),
+            )
+    finally:
+        client.close()
+
+    assert "private-provider-detail" not in str(captured.value)
 
 
 def test_model_status_page_loads_request_time_status_without_session_state() -> None:
@@ -1009,6 +1066,235 @@ def test_engineering_context_page_has_no_access_or_mutation_capability() -> None
         "patch",
         "execute",
         "generate_code",
+    ):
+        assert prohibited not in source
+
+
+def _reasoning_response(*, with_risk: bool = True) -> dict[str, object]:
+    supporting_references = [
+        {
+            "reference_id": "file:datasheet-1",
+            "source_type": "DATASHEET",
+            "reason": "The interface candidate came from this reference.",
+        }
+    ]
+    risks = (
+        [
+            {
+                "category": "interface_compatibility",
+                "description": "Interface candidate compatibility requires verification.",
+                "severity": "medium",
+                "supporting_references": supporting_references,
+            }
+        ]
+        if with_risk
+        else []
+    )
+    return {
+        "output_type": "reasoning_suggestion",
+        "reasoning_summary": {
+            "summary": "Candidate context requires engineer review.",
+            "presentation_summary": (
+                "Additional verification may be required." if with_risk else None
+            ),
+            "confidence": "medium" if with_risk else "low",
+            "assumptions": ["Candidate-only inputs."] if with_risk else [],
+        },
+        "risks": risks,
+        "next_steps": [
+            {
+                "action": "Verify interface candidate compatibility",
+                "reason": "Candidate requirements require engineer comparison.",
+            }
+        ],
+        "trace": {
+            "trace_id": "trace:request-1",
+            "context_id": "context:0123456789abcdef01234567",
+            "snapshot_fingerprint": f"sha256:{'a' * 64}",
+            "capabilities_applied": [
+                {"name": "context_analysis", "version": "1.0"},
+                {"name": "risk_detection", "version": "1.0"},
+                {"name": "verification_planning", "version": "1.0"},
+            ],
+            "rules_applied": [
+                {
+                    "rule_id": "interface_review_required",
+                    "rule_version": "1.0",
+                    "rule_source": "interface",
+                    "triggered": with_risk,
+                    "references": ["file:datasheet-1"] if with_risk else [],
+                    "reason": (
+                        "Interface candidates require review."
+                        if with_risk
+                        else "No interface candidates were provided."
+                    ),
+                }
+            ],
+            "generated_sections": (
+                ["summary", "risk", "next_step"]
+                if with_risk
+                else ["summary", "next_step"]
+            ),
+        },
+        "review_required": True,
+    }
+
+
+def _reasoning_page_source(
+    *,
+    response: dict[str, object] | None = None,
+    error_message: str | None = None,
+) -> str:
+    outcome = (
+        f"raise ExperienceApiError({error_message!r})"
+        if error_message is not None
+        else f"return {response!r}"
+    )
+    return f"""
+import streamlit as st
+import web.copilot.app_pages.reasoning_intelligence as reasoning_page
+from web.copilot.client import ExperienceApiError
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def analyze_reasoning(self, session_id, **kwargs):
+        {outcome}
+
+reasoning_page.api_client = lambda: Client()
+st.session_state["session_id"] = "session:1"
+reasoning_page.render()
+"""
+
+
+def _submit_reasoning_page(app: AppTest) -> None:
+    app.run(timeout=15)
+    app.text_area[0].input("Review referenced engineering context.")
+    app.text_input[1].input("context:0123456789abcdef01234567")
+    app.text_area[1].input("file:datasheet-1")
+    app.button[0].click().run(timeout=15)
+
+
+def test_reasoning_page_renders_transient_canonical_guidance() -> None:
+    app = AppTest.from_string(
+        _reasoning_page_source(response=_reasoning_response()),
+    )
+
+    _submit_reasoning_page(app)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.subheader) == (
+        "Analysis",
+        "Presentation Summary",
+        "Risk Candidates",
+        "Supporting References",
+        "Suggested Next Steps",
+        "Reasoning Trace",
+    )
+    rendered = tuple(item.value for item in app.markdown)
+    assert "Candidate context requires engineer review." in rendered
+    assert "Additional verification may be required." in rendered
+    assert any("interface_compatibility" in item for item in rendered)
+    assert any("file:datasheet-1" in item for item in rendered)
+    assert any("interface_review_required@1.0" in item for item in rendered)
+    assert tuple(item.value for item in app.warning) == (
+        "This output is engineering guidance only.\nEngineer validation required.",
+    )
+    assert {
+        key
+        for key in app.session_state.filtered_state
+        if not key.startswith("FormSubmitter:")
+    } == {"session_id"}
+
+
+def test_reasoning_page_renders_empty_risk_candidates() -> None:
+    app = AppTest.from_string(
+        _reasoning_page_source(response=_reasoning_response(with_risk=False)),
+    )
+
+    _submit_reasoning_page(app)
+
+    assert not app.exception
+    assert "Presentation Summary" not in tuple(item.value for item in app.subheader)
+    assert tuple(item.value for item in app.info) == (
+        "No risk candidates generated.",
+        "No supporting references available.",
+    )
+
+
+@pytest.mark.parametrize("status_code", (404, 503))
+def test_reasoning_page_shows_safe_api_errors(status_code: int) -> None:
+    app = AppTest.from_string(
+        _reasoning_page_source(
+            error_message=f"Reasoning analysis is unavailable ({status_code}).",
+        ),
+    )
+
+    _submit_reasoning_page(app)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.error) == (
+        f"Reasoning analysis is unavailable ({status_code}).",
+    )
+    assert not app.subheader
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("high_confidence", "fact_category", "invalid_trace"),
+)
+def test_reasoning_page_rejects_fact_promotion_and_invalid_contracts(
+    mutation: str,
+) -> None:
+    response = _reasoning_response()
+    if mutation == "high_confidence":
+        response["reasoning_summary"]["confidence"] = "high"  # type: ignore[index]
+    elif mutation == "fact_category":
+        response["risks"][0]["category"] = "root_cause"  # type: ignore[index]
+    else:
+        response["trace"]["snapshot_fingerprint"] = "sha256:invalid"  # type: ignore[index]
+    app = AppTest.from_string(_reasoning_page_source(response=response))
+
+    _submit_reasoning_page(app)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.error) == (
+        "Copilot API returned an invalid response.",
+    )
+    assert not app.subheader
+
+
+def test_reasoning_page_has_no_file_or_mutation_capability() -> None:
+    source = (
+        ROOT / "web" / "copilot" / "app_pages" / "reasoning_intelligence.py"
+    ).read_text(encoding="utf-8")
+
+    for prohibited in (
+        "file_uploader",
+        "download_button",
+        "open(",
+        "preview",
+        "session_state[",
+        "reasoning_runtime",
+        "context_runtime",
+        "datasheet_runtime",
+        "parser",
+        "reader",
+        "filesystem",
+        "create_patch",
+        "apply_patch",
+        "write_workspace",
+        "open_terminal",
+        "control_vscode",
+        "execute_shell",
+        "generate_code",
+        "flash_firmware",
+        "modify_code",
+        "change_pid",
     ):
         assert prohibited not in source
 

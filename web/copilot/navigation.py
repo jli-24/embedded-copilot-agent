@@ -12,6 +12,7 @@ from web.copilot.app_pages import (
     files,
     model_status,
     progress,
+    reasoning_intelligence,
     review,
     upload,
     vision,
@@ -29,6 +30,7 @@ PAGE_TITLES = (
     "File Intelligence",
     "Datasheet Intelligence",
     "Engineering Context",
+    "Reasoning Intelligence",
     "Progress",
     "Review",
     "Model Status",
@@ -92,6 +94,12 @@ def pages() -> tuple[st.Page, ...]:
             title="Engineering Context",
             icon=":material/hub:",
             url_path="engineering-context",
+        ),
+        st.Page(
+            reasoning_intelligence.render,
+            title="Reasoning Intelligence",
+            icon=":material/psychology:",
+            url_path="reasoning-intelligence",
         ),
         st.Page(
             progress.render,

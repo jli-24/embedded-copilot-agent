@@ -18,10 +18,13 @@ from embedded_copilot.api.copilot_models import (
     CopilotFileIntelligenceResponse,
     CopilotMessageRequest,
     CopilotModelStatusResponse,
+    CopilotReasoningRequest,
+    CopilotReasoningResponse,
     CopilotSessionCreateRequest,
     CopilotVisionRequest,
     CopilotVisionResponse,
 )
+from embedded_copilot.api.reasoning_adapters import ContextBackedReasoningService
 from embedded_copilot.conversation.models import ConversationMessage, ConversationTurn
 from embedded_copilot.context_runtime import EngineeringContextPort
 from embedded_copilot.context_runtime.exceptions import (
@@ -57,6 +60,13 @@ from embedded_copilot.intelligence.exceptions import (
     ModelProviderUnavailable,
 )
 from embedded_copilot.model_runtime import StatusPort
+from embedded_copilot.reasoning_runtime import (
+    ReasoningAnalysisTimeout,
+    ReasoningContextConflict,
+    ReasoningContextNotFound,
+    ReasoningRequestRejected,
+    ReasoningRuntimeUnavailable,
+)
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
     AttachmentBindingConflict,
@@ -127,6 +137,10 @@ def get_datasheet_port(request: Request) -> DatasheetIntelligencePort | None:
 
 def get_context_port(request: Request) -> EngineeringContextPort | None:
     return request.app.state.context_port
+
+
+def get_reasoning_service(request: Request) -> ContextBackedReasoningService | None:
+    return request.app.state.reasoning_service
 
 
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
@@ -238,6 +252,30 @@ def _context_error(request: Request, *, status_code: int) -> JSONResponse:
             "trace_id": request.state.trace_id,
         },
     )
+
+
+def _reasoning_error(request: Request, *, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": "reasoning_unavailable",
+            "trace_id": request.state.trace_id,
+        },
+    )
+
+
+def _map_reasoning_error(request: Request, error: Exception) -> JSONResponse:
+    if isinstance(error, ReasoningContextNotFound):
+        return _reasoning_error(request, status_code=404)
+    if isinstance(error, ReasoningContextConflict):
+        return _reasoning_error(request, status_code=409)
+    if isinstance(error, ReasoningRequestRejected):
+        return _reasoning_error(request, status_code=422)
+    if isinstance(error, ReasoningRuntimeUnavailable):
+        return _reasoning_error(request, status_code=503)
+    if isinstance(error, ReasoningAnalysisTimeout):
+        return _reasoning_error(request, status_code=504)
+    raise error
 
 
 def _map_context_error(request: Request, error: Exception) -> JSONResponse:
@@ -488,3 +526,33 @@ async def compose_engineering_context(
         )
     except Exception as error:
         return _map_context_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/reasoning",
+    response_model=CopilotReasoningResponse,
+)
+async def analyze_copilot_reasoning(
+    session_id: str,
+    payload: CopilotReasoningRequest,
+    request: Request,
+    service: ContextBackedReasoningService | None = Depends(get_reasoning_service),
+) -> CopilotReasoningResponse | JSONResponse:
+    if service is None:
+        return _reasoning_error(request, status_code=503)
+    try:
+        response = await service.analyze(
+            session_id=session_id,
+            trace_id=request.state.trace_id,
+            payload=payload,
+        )
+        return CopilotReasoningResponse(
+            output_type=response.output_type,
+            reasoning_summary=response.reasoning_summary,
+            risks=response.risks,
+            next_steps=response.next_steps,
+            trace=response.trace,
+            review_required=response.review_required,
+        )
+    except Exception as error:
+        return _map_reasoning_error(request, error)

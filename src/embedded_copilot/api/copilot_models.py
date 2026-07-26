@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Literal
 
@@ -12,6 +13,7 @@ from embedded_copilot.context_runtime.contracts import (
 )
 from embedded_copilot.copilot.models import (
     CopilotContractModel,
+    identifier_tuple,
     safe_identifier,
     safe_summary,
     utc_datetime,
@@ -21,6 +23,12 @@ from embedded_copilot.multimodal.context import AttachmentBinding
 from embedded_copilot.multimodal.models import (
     MultimodalInput,
     MultimodalInputType,
+)
+from embedded_copilot.reasoning_runtime import (
+    NextStep,
+    ReasoningSummary,
+    ReasoningTrace,
+    RiskCandidate,
 )
 from embedded_copilot.schemas.result import ContractModel
 
@@ -252,8 +260,6 @@ class CopilotEngineeringContextRequest(CopilotContractModel):
     @field_validator("reference_ids", mode="before")
     @classmethod
     def validate_reference_ids(cls, value: object) -> object:
-        from embedded_copilot.copilot.models import identifier_tuple
-
         return identifier_tuple(value, field="reference_id")
 
     def to_context_request(self, session_id: str) -> EngineeringContextRequest:
@@ -267,6 +273,53 @@ class CopilotEngineeringContextRequest(CopilotContractModel):
 class CopilotEngineeringContextResponse(CopilotContractModel):
     output_type: Literal["context_summary"] = "context_summary"
     context_summary: EngineeringContextSummary
+    review_required: Literal[True] = True
+
+
+_CONTEXT_ID = re.compile(r"^context:[a-f0-9]{24}$")
+
+
+class CopilotReasoningRequest(CopilotContractModel):
+    task_intent: str
+    context_id: str
+    reference_ids: tuple[str, ...] = ()
+
+    @field_validator("task_intent", mode="before")
+    @classmethod
+    def validate_task_intent(cls, value: object) -> str:
+        return safe_summary(value, field="task_intent")
+
+    @field_validator("context_id", mode="before")
+    @classmethod
+    def validate_context_id(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise ValueError("context_id is invalid")
+        candidate = value.strip()
+        if _CONTEXT_ID.fullmatch(candidate) is None:
+            raise ValueError("context_id is invalid")
+        return candidate
+
+    @field_validator("reference_ids", mode="before")
+    @classmethod
+    def validate_reference_ids(cls, value: object) -> object:
+        from embedded_copilot.copilot.models import identifier_tuple
+
+        return identifier_tuple(value, field="reference_id")
+
+    def to_context_request(self, session_id: str) -> EngineeringContextRequest:
+        return EngineeringContextRequest(
+            session_id=session_id,
+            task_intent=self.task_intent,
+            reference_ids=self.reference_ids,
+        )
+
+
+class CopilotReasoningResponse(CopilotContractModel):
+    output_type: Literal["reasoning_suggestion"] = "reasoning_suggestion"
+    reasoning_summary: ReasoningSummary
+    risks: tuple[RiskCandidate, ...] = ()
+    next_steps: tuple[NextStep, ...] = ()
+    trace: ReasoningTrace
     review_required: Literal[True] = True
 
 
