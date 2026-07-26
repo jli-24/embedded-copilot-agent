@@ -63,9 +63,7 @@ def test_router_selects_first_registered_capability_match() -> None:
     second = _Provider("second-provider", (ModelCapability.CHAT,))
     router = ModelRouter(ProviderRegistry((first, second)))
 
-    response = asyncio.run(
-        router.generate(_request(ModelTaskType.CHAT), _input())
-    )
+    response = asyncio.run(router.generate(_request(ModelTaskType.CHAT), _input()))
 
     assert response.source == "first-provider"
     assert first.calls == 1
@@ -119,13 +117,15 @@ def test_multi_model_registration_does_not_change_model_request_contract() -> No
         )
     )
 
-    response = asyncio.run(
-        router.generate(_request(ModelTaskType.CODE), _input())
-    )
+    response = asyncio.run(router.generate(_request(ModelTaskType.CODE), _input()))
 
     assert response.source == "code-model"
-    assert tuple(ModelRequest.model_fields) == fields_before == (
-        "task_type",
-        "input_type",
-        "context_ids",
+    assert (
+        tuple(ModelRequest.model_fields)
+        == fields_before
+        == (
+            "task_type",
+            "input_type",
+            "context_ids",
+        )
     )

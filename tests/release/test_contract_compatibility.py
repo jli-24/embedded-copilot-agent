@@ -93,6 +93,7 @@ def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
         "/api/v1/report/{execution_id}": ("get",),
         "/api/v1/chat": ("post",),
         "/api/v1/health": ("get",),
+        "/api/v1/copilot/models/status": ("get",),
         "/api/v1/copilot/sessions": ("post",),
         "/api/v1/copilot/sessions/{session_id}": ("get",),
         "/api/v1/copilot/sessions/{session_id}/attachments": ("post",),

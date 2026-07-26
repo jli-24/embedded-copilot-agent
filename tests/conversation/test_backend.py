@@ -74,9 +74,7 @@ class _ReasoningPort:
         context_summaries: tuple[str, ...],
         task_intent: str,
     ) -> ReasoningOutput:
-        self.calls.append(
-            (user_message_summary, context_summaries, task_intent)
-        )
+        self.calls.append((user_message_summary, context_summaries, task_intent))
         return self.output
 
 

@@ -33,6 +33,4 @@ def render() -> None:
         )
     else:
         labels = ()
-    st.caption(
-        f"Capabilities: {', '.join(item for item in labels if item) or 'None'}"
-    )
+    st.caption(f"Capabilities: {', '.join(item for item in labels if item) or 'None'}")

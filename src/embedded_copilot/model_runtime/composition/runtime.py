@@ -47,4 +47,4 @@ def create_model_runtime(
     registry = ProviderRegistry(providers)
     router = ModelRouter(registry)
     gateway = ModelGateway(router)
-    return ModelRuntime(GatewayReasoningPort(gateway), status)
+    return ModelRuntime._compose(GatewayReasoningPort(gateway), status)
