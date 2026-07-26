@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
+from embedded_copilot.intelligence._validation import safe_identifier, safe_text
+from embedded_copilot.intelligence.models import IntelligenceContractModel
 from embedded_copilot.schemas.result import ContractModel
 
 
@@ -17,6 +19,28 @@ class FileType(StrEnum):
     CODE = "code"
     TEXT = "text"
     UNKNOWN = "unknown"
+
+
+class MultimodalInputType(StrEnum):
+    TEXT = "TEXT"
+    IMAGE = "IMAGE"
+    FILE = "FILE"
+
+
+class MultimodalInput(IntelligenceContractModel):
+    type: MultimodalInputType
+    reference_id: str
+    summary: str
+
+    @field_validator("reference_id", mode="before")
+    @classmethod
+    def validate_reference_id(cls, value: object) -> str:
+        return safe_identifier(value, field="reference_id")
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def validate_summary(cls, value: object) -> str:
+        return safe_text(value, field="summary", max_length=512)
 
 
 class FileDocument(ContractModel):
