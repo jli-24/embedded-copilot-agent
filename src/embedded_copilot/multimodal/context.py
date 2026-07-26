@@ -101,9 +101,7 @@ class ProcessLocalAttachmentBindingRepository:
             if reference_key in session:
                 raise AttachmentBindingConflict("attachment reference already exists")
             if len(session) >= self._max_references_per_session:
-                raise AttachmentBindingConflict(
-                    "attachment session capacity reached"
-                )
+                raise AttachmentBindingConflict("attachment session capacity reached")
             session[reference_key] = snapshot
 
     def get(self, session_id: str, reference_id: str) -> AttachmentBinding:

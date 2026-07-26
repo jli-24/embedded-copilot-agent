@@ -52,9 +52,7 @@ def _parsed() -> UnifiedDatasheetModel:
                     "description": "UART transmit",
                 }
             ],
-            "interfaces": [
-                {"name": "UART0", "protocol": "UART", "pins": ["43"]}
-            ],
+            "interfaces": [{"name": "UART0", "protocol": "UART", "pins": ["43"]}],
             "electrical_specs": [
                 {
                     "parameter": "Supply range",

@@ -11,7 +11,7 @@ def main() -> None:
         page_icon=":material/developer_board:",
         layout="wide",
     )
-    navigation = st.navigation(pages(), position="top")
+    navigation = st.navigation(pages(), position="sidebar")
     navigation.run()
 
 

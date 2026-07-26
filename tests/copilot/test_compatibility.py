@@ -98,6 +98,7 @@ def test_only_approved_adapters_may_depend_on_workspace() -> None:
         package_root / "api" / "copilot_routes.py",
         package_root / "experience" / "existing_contracts.py",
         package_root / "intelligence" / "esp32.py",
+        package_root / "services" / "experience_runtime.py",
     }
     consumers = tuple(
         path

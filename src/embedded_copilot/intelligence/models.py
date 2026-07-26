@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import math
-import re
 from collections.abc import Iterator, Mapping
 from enum import StrEnum
 from typing import Literal, TypeAlias

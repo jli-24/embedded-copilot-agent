@@ -18,6 +18,11 @@ from web.copilot.state import (
 def render() -> None:
     st.title("Chat")
     session_id = active_session_id()
+    reference_text = st.text_input(
+        "Reference IDs",
+        placeholder="image:1, file:1",
+        disabled=not session_id,
+    )
     if session_id:
         answer_summary, handoff = conversation_result(session_id)
         if answer_summary is not None:
@@ -43,6 +48,9 @@ def render() -> None:
                 message_id=f"message:{uuid4().hex}",
                 summary=prompt,
                 created_at=datetime.now(timezone.utc).isoformat(),
+                references=tuple(
+                    item.strip() for item in reference_text.split(",") if item.strip()
+                ),
             )
     except ExperienceApiError as error:
         show_api_error(error)

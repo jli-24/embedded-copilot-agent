@@ -22,8 +22,27 @@ from embedded_copilot.conversation.router import IntentRouter
 from embedded_copilot.conversation.service import ConversationService
 from embedded_copilot.copilot.session import create_session
 from embedded_copilot.copilot.workspace import create_workspace
+from embedded_copilot.copilot.models import (
+    WorkspaceFileSource,
+    WorkspaceFileStatus,
+    WorkspaceFileType,
+)
+from embedded_copilot.copilot.workspace import WorkspaceFile, track_file
 from embedded_copilot.intelligence.models import ModelInput, ModelResponse
-from embedded_copilot.schemas.model import ModelRequest
+from embedded_copilot.multimodal.context import (
+    AttachmentBinding,
+    AttachmentBindingNotFound,
+    ProcessLocalAttachmentBindingRepository,
+)
+from embedded_copilot.multimodal.models import (
+    MultimodalInput,
+    MultimodalInputType,
+)
+from embedded_copilot.schemas.model import (
+    ModelInputType,
+    ModelRequest,
+    ModelTaskType,
+)
 
 UTC = timezone.utc
 CREATED = datetime(2026, 7, 26, 8, 0, tzinfo=UTC)
@@ -46,7 +65,7 @@ class _ReasoningPort:
         self.output = ReasoningOutput(
             response=ModelResponse(
                 text="Candidate explanation requiring engineering validation.",
-                metadata={"request_marker": "MODEL_METADATA_SENTINEL"},
+                metadata={"finish_reason": "deterministic"},
                 source="test-reasoner",
             ),
             reasoning_chain=("REASONING_CHAIN_SENTINEL",),
@@ -65,12 +84,14 @@ class _ReasoningPort:
 def _service(
     repository: ProcessLocalConversationRepository,
     reasoning: _ReasoningPort,
+    attachments: ProcessLocalAttachmentBindingRepository | None = None,
 ) -> ConversationService:
     return ConversationService(
         repository=repository,
         context_resolver=ContextResolver(),
         intent_router=IntentRouter(),
         reasoning=reasoning,
+        attachment_repository=attachments,
     )
 
 
@@ -145,7 +166,7 @@ def test_reasoning_output_expiration() -> None:
     serialized = repository.get("session:1").model_dump_json()
     assert "Reasoning suggestion returned for user review." in serialized
     assert "Candidate explanation requiring engineering validation." not in serialized
-    assert "MODEL_METADATA_SENTINEL" not in serialized
+    assert "finish_reason" not in serialized
     assert "REASONING_CHAIN_SENTINEL" not in serialized
     assert "TEMPORARY_CONTEXT_SENTINEL" not in serialized
 
@@ -189,3 +210,87 @@ def test_conversation_record_rejects_engineering_fact_fields() -> None:
     ):
         with pytest.raises(ValidationError):
             ConversationTurn.model_validate({**payload, forbidden_key: "unsafe"})
+
+
+def test_image_reference_routes_to_vision_with_session_bound_context() -> None:
+    repository = ProcessLocalConversationRepository()
+    workspace = track_file(
+        _workspace(),
+        WorkspaceFile(
+            file_id="image:1",
+            filename="schematic.png",
+            file_type=WorkspaceFileType.OTHER,
+            size_bytes=1024,
+            source=WorkspaceFileSource.INPUT,
+            status=WorkspaceFileStatus.REFERENCED,
+            created_at=CREATED + timedelta(minutes=1),
+        ),
+    )
+    repository.add(workspace)
+    attachments = ProcessLocalAttachmentBindingRepository()
+    attachments.bind(
+        AttachmentBinding(
+            session_id="session:1",
+            input=MultimodalInput(
+                type=MultimodalInputType.IMAGE,
+                reference_id="image:1",
+                summary="ESP32 schematic image reference.",
+            ),
+            basename="schematic.png",
+            size_bytes=1024,
+            created_at=CREATED + timedelta(minutes=1),
+        )
+    )
+    reasoning = _ReasoningPort()
+
+    turn = asyncio.run(
+        _service(repository, reasoning, attachments).send_message(
+            ConversationMessage(
+                session_id="session:1",
+                message_id="message:vision",
+                content_summary="Review this ESP32 schematic image.",
+                references=("image:1",),
+                created_at=CREATED + timedelta(minutes=2),
+            )
+        )
+    )
+
+    request, model_input = reasoning.calls[0]
+    assert turn.intent is ConversationIntent.VISION_ANALYSIS
+    assert request.task_type is ModelTaskType.VISION
+    assert request.input_type is ModelInputType.IMAGE
+    assert request.context_ids == ("session:1", "image:1")
+    assert "ESP32 schematic image reference." in model_input.context_summaries
+    assert repository.get("session:1").messages[0].references == ("image:1",)
+
+
+def test_conversation_rejects_reference_bound_to_another_session() -> None:
+    repository = ProcessLocalConversationRepository()
+    repository.add(_workspace())
+    attachments = ProcessLocalAttachmentBindingRepository()
+    attachments.bind(
+        AttachmentBinding(
+            session_id="session:2",
+            input=MultimodalInput(
+                type=MultimodalInputType.IMAGE,
+                reference_id="image:1",
+                summary="Another session image reference.",
+            ),
+            basename="private.png",
+            size_bytes=128,
+            created_at=CREATED + timedelta(minutes=1),
+        )
+    )
+
+    with pytest.raises(AttachmentBindingNotFound):
+        asyncio.run(
+            _service(repository, _ReasoningPort(), attachments).send_message(
+                ConversationMessage(
+                    session_id="session:1",
+                    message_id="message:cross-session",
+                    content_summary="Review this image.",
+                    references=("image:1",),
+                    created_at=CREATED + timedelta(minutes=2),
+                )
+            )
+        )

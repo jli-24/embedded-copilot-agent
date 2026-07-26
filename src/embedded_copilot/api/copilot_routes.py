@@ -7,8 +7,12 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from embedded_copilot.api.copilot_models import (
+    CopilotAttachmentReceipt,
+    CopilotAttachmentRequest,
     CopilotMessageRequest,
     CopilotSessionCreateRequest,
+    CopilotVisionRequest,
+    CopilotVisionResponse,
 )
 from embedded_copilot.conversation.models import ConversationMessage, ConversationTurn
 from embedded_copilot.conversation.repository import (
@@ -20,6 +24,12 @@ from embedded_copilot.intelligence.exceptions import (
     ModelGatewayError,
     ModelProviderUnavailable,
 )
+from embedded_copilot.multimodal.context import (
+    AttachmentBinding,
+    AttachmentBindingConflict,
+    AttachmentBindingNotFound,
+)
+from embedded_copilot.vision.models import VisionSuggestion
 
 
 class WorkspaceService(Protocol):
@@ -47,6 +57,22 @@ class WorkspaceService(Protocol):
         trace_id: str,
     ) -> ConversationTurn: ...
 
+    def bind_attachment(
+        self,
+        binding: AttachmentBinding,
+        *,
+        trace_id: str,
+    ) -> AttachmentBinding: ...
+
+    async def analyze_vision(
+        self,
+        *,
+        session_id: str,
+        reference_id: str,
+        message_summary: str,
+        trace_id: str,
+    ) -> VisionSuggestion: ...
+
 
 def get_workspace_service(request: Request) -> WorkspaceService | None:
     return request.app.state.workspace_service
@@ -60,13 +86,13 @@ def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
 
 
 def _map_error(request: Request, error: Exception) -> JSONResponse:
-    if isinstance(error, ConversationNotFound):
+    if isinstance(error, (ConversationNotFound, AttachmentBindingNotFound)):
         return _error(
             request,
             status_code=404,
             detail="Copilot session was not found.",
         )
-    if isinstance(error, ConversationStateConflict):
+    if isinstance(error, (ConversationStateConflict, AttachmentBindingConflict)):
         return _error(
             request,
             status_code=409,
@@ -160,5 +186,60 @@ async def send_copilot_message(
             payload.to_message(session_id),
             trace_id=request.state.trace_id,
         )
+    except Exception as error:
+        return _map_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/attachments",
+    response_model=CopilotAttachmentReceipt,
+    status_code=201,
+)
+def bind_copilot_attachment(
+    session_id: str,
+    payload: CopilotAttachmentRequest,
+    request: Request,
+    service: WorkspaceService | None = Depends(get_workspace_service),
+) -> CopilotAttachmentReceipt | JSONResponse:
+    if service is None:
+        return _error(
+            request,
+            status_code=503,
+            detail="Copilot workspace service is unavailable.",
+        )
+    try:
+        binding = service.bind_attachment(
+            payload.to_binding(session_id),
+            trace_id=request.state.trace_id,
+        )
+        return CopilotAttachmentReceipt.from_binding(binding)
+    except Exception as error:
+        return _map_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/vision",
+    response_model=CopilotVisionResponse,
+)
+async def analyze_copilot_vision(
+    session_id: str,
+    payload: CopilotVisionRequest,
+    request: Request,
+    service: WorkspaceService | None = Depends(get_workspace_service),
+) -> CopilotVisionResponse | JSONResponse:
+    if service is None:
+        return _error(
+            request,
+            status_code=503,
+            detail="Copilot workspace service is unavailable.",
+        )
+    try:
+        suggestion = await service.analyze_vision(
+            session_id=session_id,
+            reference_id=payload.reference_id,
+            message_summary=payload.message_summary,
+            trace_id=request.state.trace_id,
+        )
+        return CopilotVisionResponse(summary=suggestion.summary)
     except Exception as error:
         return _map_error(request, error)

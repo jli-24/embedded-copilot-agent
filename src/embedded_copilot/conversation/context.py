@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from embedded_copilot.copilot.workspace import ProjectWorkspace
 from embedded_copilot.intelligence.models import ModelInput
 
@@ -14,6 +16,8 @@ class ContextResolver:
         self,
         workspace: ProjectWorkspace,
         message_summary: str,
+        *,
+        reference_summaries: Sequence[str] = (),
     ) -> ModelInput:
         isolated = ProjectWorkspace.model_validate(workspace.model_dump(mode="python"))
         recent = isolated.messages[-self._max_message_summaries :]
@@ -21,6 +25,7 @@ class ContextResolver:
             f"Project: {isolated.session.project_name}",
             f"Stage: {isolated.session.current_stage.value}",
             *(item.content_summary for item in recent),
+            *reference_summaries,
         )
         return ModelInput(
             message_summary=message_summary,

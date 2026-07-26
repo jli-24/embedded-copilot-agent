@@ -51,7 +51,9 @@ class SecureFileReader:
                 raise ValueError("unsupported reference")
             root = self._resolver.root
             candidate = self._resolver.resolve(snapshot)
-            if candidate.name != snapshot.basename or not candidate.is_relative_to(root):
+            if candidate.name != snapshot.basename or not candidate.is_relative_to(
+                root
+            ):
                 raise ValueError("target mismatch")
 
             cursor = root

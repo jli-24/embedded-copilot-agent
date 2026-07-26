@@ -11,6 +11,12 @@ from embedded_copilot.conversation.repository import (
 )
 from embedded_copilot.conversation.router import IntentRouter
 from embedded_copilot.conversation.service import ConversationService
+from embedded_copilot.copilot.models import (
+    WorkspaceFileSource,
+    WorkspaceFileStatus,
+    WorkspaceFileType,
+)
+from embedded_copilot.copilot.workspace import WorkspaceFile, track_file
 from embedded_copilot.experience.existing_contracts import (
     ArtifactView,
     DesignSessionContext,
@@ -25,13 +31,34 @@ from embedded_copilot.experience.service import (
 )
 from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
 from embedded_copilot.intelligence.models import ModelInput
+from embedded_copilot.multimodal.context import (
+    AttachmentBinding,
+    AttachmentBindingConflict,
+    AttachmentBindingNotFound,
+    ProcessLocalAttachmentBindingRepository,
+)
+from embedded_copilot.multimodal.models import (
+    MultimodalInput,
+    MultimodalInputType,
+)
 from embedded_copilot.schemas.knowledge_trace import KnowledgeTrace
 from embedded_copilot.schemas.model import ModelRequest
+from embedded_copilot.vision.models import VisionSuggestion
+from embedded_copilot.vision.service import VisionService
 
 
 class _UnavailableReasoningPort:
     async def reason(self, request: ModelRequest, model_input: ModelInput):
         raise ModelProviderUnavailable("No reasoning provider is configured")
+
+
+class _UnavailableVisionAdapter:
+    async def analyze(
+        self,
+        input: MultimodalInput,
+        message_summary: str,
+    ) -> VisionSuggestion:
+        raise ModelProviderUnavailable("No vision provider is configured")
 
 
 class _ArtifactProjectionPort:
@@ -85,9 +112,13 @@ class ProcessLocalWorkspaceService:
         *,
         repository: ProcessLocalConversationRepository,
         conversation_service: ConversationService,
+        attachment_repository: ProcessLocalAttachmentBindingRepository,
+        vision_service: VisionService,
     ) -> None:
         self._repository = repository
         self._conversation_service = conversation_service
+        self._attachment_repository = attachment_repository
+        self._vision_service = vision_service
 
     async def create_session(
         self,
@@ -120,24 +151,90 @@ class ProcessLocalWorkspaceService:
     ) -> ConversationTurn:
         return await self._conversation_service.send_message(message)
 
+    def bind_attachment(
+        self,
+        binding: AttachmentBinding,
+        *,
+        trace_id: str,
+    ) -> AttachmentBinding:
+        workspace = self._repository.get(binding.session_id)
+        try:
+            self._attachment_repository.get(
+                binding.session_id,
+                binding.input.reference_id,
+            )
+        except AttachmentBindingNotFound:
+            pass
+        else:
+            raise AttachmentBindingConflict("attachment reference already exists")
+        if binding.input.type is MultimodalInputType.TEXT:
+            raise AttachmentBindingConflict("attachment type is invalid")
+        file_type = (
+            WorkspaceFileType.DATASHEET
+            if binding.input.type is MultimodalInputType.FILE
+            else WorkspaceFileType.OTHER
+        )
+        updated = track_file(
+            workspace,
+            WorkspaceFile(
+                file_id=binding.input.reference_id,
+                filename=binding.basename,
+                file_type=file_type,
+                size_bytes=binding.size_bytes,
+                source=WorkspaceFileSource.INPUT,
+                status=WorkspaceFileStatus.REFERENCED,
+                created_at=binding.created_at,
+            ),
+        )
+        self._attachment_repository.bind(binding)
+        self._repository.save(updated)
+        return self._attachment_repository.get(
+            binding.session_id,
+            binding.input.reference_id,
+        )
+
+    async def analyze_vision(
+        self,
+        *,
+        session_id: str,
+        reference_id: str,
+        message_summary: str,
+        trace_id: str,
+    ) -> VisionSuggestion:
+        self._repository.get(session_id)
+        return await self._vision_service.analyze(
+            session_id=session_id,
+            reference_id=reference_id,
+            message_summary=message_summary,
+        )
+
 
 @dataclass(frozen=True)
 class ExperienceRuntime:
     workspace_service: ProcessLocalWorkspaceService
     experience_service: ProcessLocalExperienceService
+    attachment_repository: ProcessLocalAttachmentBindingRepository
 
 
 def build_experience_runtime() -> ExperienceRuntime:
     repository = ProcessLocalConversationRepository()
+    attachment_repository = ProcessLocalAttachmentBindingRepository()
+    vision_service = VisionService(
+        repository=attachment_repository,
+        adapter=_UnavailableVisionAdapter(),
+    )
     conversation_service = ConversationService(
         repository=repository,
         context_resolver=ContextResolver(),
         intent_router=IntentRouter(),
         reasoning=_UnavailableReasoningPort(),
+        attachment_repository=attachment_repository,
     )
     workspace_service = ProcessLocalWorkspaceService(
         repository=repository,
         conversation_service=conversation_service,
+        attachment_repository=attachment_repository,
+        vision_service=vision_service,
     )
     experience_service = ProcessLocalExperienceService(
         workspace_port=_WorkspaceProjectionPort(repository),
@@ -151,4 +248,5 @@ def build_experience_runtime() -> ExperienceRuntime:
     return ExperienceRuntime(
         workspace_service=workspace_service,
         experience_service=experience_service,
+        attachment_repository=attachment_repository,
     )

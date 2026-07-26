@@ -75,6 +75,7 @@ class CopilotExperienceClient:
         message_id: str,
         summary: str,
         created_at: str,
+        references: tuple[str, ...] = (),
     ) -> JsonObject:
         return self._request(
             "POST",
@@ -83,6 +84,47 @@ class CopilotExperienceClient:
                 "message_id": message_id,
                 "content_summary": summary,
                 "created_at": created_at,
+                "references": list(references),
+            },
+        )
+
+    def bind_attachment(
+        self,
+        session_id: str,
+        *,
+        reference_id: str,
+        input_type: str,
+        basename: str,
+        summary: str,
+        size_bytes: int,
+        created_at: str,
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            f"{self._session_url(session_id)}/attachments",
+            json={
+                "reference_id": reference_id,
+                "type": input_type,
+                "basename": basename,
+                "summary": summary,
+                "size_bytes": size_bytes,
+                "created_at": created_at,
+            },
+        )
+
+    def analyze_vision(
+        self,
+        session_id: str,
+        *,
+        reference_id: str,
+        message_summary: str,
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            f"{self._session_url(session_id)}/vision",
+            json={
+                "reference_id": reference_id,
+                "message_summary": message_summary,
             },
         )
 

@@ -64,7 +64,9 @@ def test_secure_reader_rejects_size_mismatch(tmp_path: Path) -> None:
     )
 
     with pytest.raises(FileReadRejected, match="validation failed"):
-        reader.extract(_binding(source, size_bytes=source.stat().st_size + 1), _Extractor())
+        reader.extract(
+            _binding(source, size_bytes=source.stat().st_size + 1), _Extractor()
+        )
 
 
 def test_secure_reader_closes_request_scoped_stream(tmp_path: Path) -> None:
@@ -96,9 +98,7 @@ def test_secure_reader_rejects_symlink(tmp_path: Path) -> None:
         link.symlink_to(source)
     except OSError:
         pytest.skip("symlink creation is unavailable")
-    reader = SecureFileReader(
-        RootedReferenceResolver(tmp_path, {"file:1": link.name})
-    )
+    reader = SecureFileReader(RootedReferenceResolver(tmp_path, {"file:1": link.name}))
 
     with pytest.raises(FileReadRejected, match="validation failed"):
         reader.extract(_binding(link), _Extractor())

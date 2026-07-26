@@ -13,6 +13,7 @@ TARGET_FILES = (
     PACKAGE_ROOT / "services" / "experience_runtime.py",
 )
 EXISTING_CONTRACT_ADAPTER = PACKAGE_ROOT / "experience" / "existing_contracts.py"
+EXPERIENCE_RUNTIME = PACKAGE_ROOT / "services" / "experience_runtime.py"
 FORBIDDEN_IMPORT_PREFIXES = (
     "embedded_copilot.hardware_design.artifact",
     "embedded_copilot.hardware_design.evidence",
@@ -52,8 +53,10 @@ FORBIDDEN_SESSION_KEYS = {
 ALLOWED_SESSION_KEYS = {
     "session_id",
     "answer_summary",
+    "attachment_receipt",
     "handoff",
     "review_receipt",
+    "vision_suggestion",
 }
 
 
@@ -93,7 +96,10 @@ def test_experience_has_no_forbidden_dependencies() -> None:
                 module = node.module or ""
                 assert not module.startswith(FORBIDDEN_IMPORT_PREFIXES), path
                 if module.startswith("embedded_copilot.copilot"):
-                    assert path == EXISTING_CONTRACT_ADAPTER, path
+                    assert path in {
+                        EXISTING_CONTRACT_ADAPTER,
+                        EXPERIENCE_RUNTIME,
+                    }, path
                 if path.is_relative_to(WEB_ROOT):
                     assert not module.startswith("embedded_copilot"), path
                 assert not (

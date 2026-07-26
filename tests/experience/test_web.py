@@ -16,8 +16,10 @@ ROOT = Path(__file__).parents[2]
 ALLOWED_SESSION_STATE_KEYS = {
     "session_id",
     "answer_summary",
+    "attachment_receipt",
     "handoff",
     "review_receipt",
+    "vision_suggestion",
 }
 
 
@@ -30,11 +32,14 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
     assert PAGE_TITLES == (
         "Workspace",
         "Chat",
+        "Upload",
+        "Vision",
         "Blueprint",
         "Evidence",
         "Files",
         "Progress",
         "Review",
+        "Model Status",
     )
 
 
@@ -43,11 +48,14 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
     (
         ("workspace", "Workspace"),
         ("chat", "Chat"),
+        ("upload", "Upload"),
+        ("vision", "Vision"),
         ("blueprint", "Blueprint"),
         ("evidence", "Evidence"),
         ("files", "Files"),
         ("progress", "Progress"),
         ("review", "Review"),
+        ("model_status", "Model Status"),
     ),
 )
 def test_each_streamlit_page_loads_with_only_allowed_session_state(
@@ -218,6 +226,21 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             message_id="message:1",
             summary="Explain the available evidence.",
             created_at="2026-07-26T08:01:00Z",
+            references=("image:1",),
+        )
+        client.bind_attachment(
+            "session:1",
+            reference_id="image:1",
+            input_type="IMAGE",
+            basename="schematic.png",
+            summary="ESP32 schematic image reference.",
+            size_bytes=1024,
+            created_at="2026-07-26T08:01:30Z",
+        )
+        client.analyze_vision(
+            "session:1",
+            reference_id="image:1",
+            message_summary="Review the referenced schematic.",
         )
         client.record_review(
             "session:1",
@@ -236,6 +259,8 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("GET", "/api/v1/copilot/sessions/session:1/files"),
         ("GET", "/api/v1/copilot/sessions/session:1/progress"),
         ("POST", "/api/v1/copilot/sessions/session:1/messages"),
+        ("POST", "/api/v1/copilot/sessions/session:1/attachments"),
+        ("POST", "/api/v1/copilot/sessions/session:1/vision"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
     ]
     review_payload = json.loads(requests[-1].content)
@@ -332,4 +357,61 @@ def test_files_page_uses_only_safe_metadata_columns() -> None:
         "source",
         "status",
         "timestamp",
+    )
+
+
+def test_upload_page_registers_references_without_file_bytes() -> None:
+    source = (ROOT / "web" / "copilot" / "app_pages" / "upload.py").read_text(
+        encoding="utf-8"
+    )
+
+    for prohibited in (
+        "file_uploader",
+        "accept_file",
+        "read(",
+        "getvalue(",
+        "b64encode",
+        "content=",
+    ):
+        assert prohibited not in source
+
+
+def test_multimodal_state_is_not_reused_across_sessions() -> None:
+    app = AppTest.from_string(
+        """
+import streamlit as st
+from web.copilot.state import (
+    attachment_receipt,
+    store_attachment_receipt,
+    store_vision_suggestion,
+    vision_suggestion,
+)
+
+store_attachment_receipt(
+    "session:1",
+    {
+        "session_id": "session:1",
+        "reference_id": "image:1",
+        "type": "IMAGE",
+        "basename": "schematic.png",
+        "summary": "Image reference.",
+        "size_bytes": 1,
+        "status": "REFERENCED",
+        "created_at": "2026-07-26T08:01:00Z",
+    },
+)
+store_vision_suggestion(
+    "session:1",
+    {"type": "reasoning_suggestion", "summary": "Review required."},
+)
+st.write(attachment_receipt("session:2") or "No cross-session attachment.")
+st.write(vision_suggestion("session:2") or "No cross-session suggestion.")
+""",
+    )
+    app.run(timeout=15)
+
+    assert not app.exception
+    assert tuple(item.value for item in app.markdown) == (
+        "No cross-session attachment.",
+        "No cross-session suggestion.",
     )
