@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     request_timeout_seconds: float = Field(default=10.0, gt=0.0, le=120.0)
     analysis_timeout_seconds: float = Field(default=120.0, gt=0.0, le=600.0)
     analysis_registry_capacity: int = Field(default=100, ge=1, le=10_000)
+    model_provider: Literal["unavailable", "ollama"] = "unavailable"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_model: str | None = None
+    ollama_require_tls: bool = False
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":
