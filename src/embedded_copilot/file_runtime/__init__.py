@@ -9,6 +9,7 @@ from embedded_copilot.file_runtime.contracts import (
     FileReferenceRequest,
     FileType,
 )
+from embedded_copilot.file_runtime.composition import create_file_runtime
 from embedded_copilot.file_runtime.exceptions import (
     FileAnalysisTimeout,
     FileReferenceConflict,
@@ -32,4 +33,5 @@ __all__ = [
     "FileRuntimeError",
     "FileRuntimeUnavailable",
     "FileType",
+    "create_file_runtime",
 ]

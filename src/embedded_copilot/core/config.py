@@ -48,6 +48,12 @@ class Settings(BaseSettings):
     ollama_vision_base_url: str = "http://127.0.0.1:11434"
     ollama_vision_model: str | None = None
     ollama_vision_require_tls: bool = False
+    file_workspace_root: Path | None = None
+    file_max_size_bytes: int = Field(
+        default=25 * 1024 * 1024,
+        ge=1,
+        le=100 * 1024 * 1024,
+    )
 
     @model_validator(mode="after")
     def validate_chunk_window(self) -> "Settings":
