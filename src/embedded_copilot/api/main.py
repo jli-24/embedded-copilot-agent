@@ -20,6 +20,7 @@ from embedded_copilot.api.experience_routes import (
     router as experience_router,
 )
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
+from embedded_copilot.model_runtime import create_model_runtime
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
@@ -62,12 +63,15 @@ def create_app(
     experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
 ) -> FastAPI:
     active_settings = settings or Settings()
+    model_runtime = create_model_runtime(active_settings)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         default_experience_runtime = None
         if isinstance(workspace_service, _UnsetService):
-            default_experience_runtime = build_experience_runtime()
+            default_experience_runtime = build_experience_runtime(
+                reasoning=model_runtime.reasoning_port()
+            )
             active_workspace_service: WorkspaceService | None = (
                 default_experience_runtime.workspace_service
             )

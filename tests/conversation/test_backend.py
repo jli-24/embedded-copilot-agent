@@ -28,7 +28,7 @@ from embedded_copilot.copilot.models import (
     WorkspaceFileType,
 )
 from embedded_copilot.copilot.workspace import WorkspaceFile, track_file
-from embedded_copilot.intelligence.models import ModelInput, ModelResponse
+from embedded_copilot.intelligence.models import ModelResponse
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
     AttachmentBindingNotFound,
@@ -37,11 +37,6 @@ from embedded_copilot.multimodal.context import (
 from embedded_copilot.multimodal.models import (
     MultimodalInput,
     MultimodalInputType,
-)
-from embedded_copilot.schemas.model import (
-    ModelInputType,
-    ModelRequest,
-    ModelTaskType,
 )
 
 UTC = timezone.utc
@@ -61,7 +56,7 @@ def _workspace(session_id: str = "session:1"):
 
 class _ReasoningPort:
     def __init__(self) -> None:
-        self.calls: list[tuple[ModelRequest, ModelInput]] = []
+        self.calls: list[tuple[str, tuple[str, ...], str]] = []
         self.output = ReasoningOutput(
             response=ModelResponse(
                 text="Candidate explanation requiring engineering validation.",
@@ -74,10 +69,14 @@ class _ReasoningPort:
 
     async def reason(
         self,
-        request: ModelRequest,
-        model_input: ModelInput,
+        *,
+        user_message_summary: str,
+        context_summaries: tuple[str, ...],
+        task_intent: str,
     ) -> ReasoningOutput:
-        self.calls.append((request, model_input))
+        self.calls.append(
+            (user_message_summary, context_summaries, task_intent)
+        )
         return self.output
 
 
@@ -155,11 +154,11 @@ def test_reasoning_output_expiration() -> None:
         )
     )
 
-    captured_input = reasoning.calls[0][1]
+    captured_context = reasoning.calls[0][1]
     assert not repository.contains(reasoning.output.response)
     assert not repository.contains(reasoning.output.reasoning_chain)
     assert not repository.contains(reasoning.output.temporary_context)
-    assert not repository.contains(captured_input)
+    assert not repository.contains(captured_context)
     assert turn.answer_summary == (
         "Candidate explanation requiring engineering validation."
     )
@@ -255,12 +254,11 @@ def test_image_reference_routes_to_vision_with_session_bound_context() -> None:
         )
     )
 
-    request, model_input = reasoning.calls[0]
+    message_summary, context_summaries, task_intent = reasoning.calls[0]
     assert turn.intent is ConversationIntent.VISION_ANALYSIS
-    assert request.task_type is ModelTaskType.VISION
-    assert request.input_type is ModelInputType.IMAGE
-    assert request.context_ids == ("session:1", "image:1")
-    assert "ESP32 schematic image reference." in model_input.context_summaries
+    assert task_intent == "VISION_ANALYSIS"
+    assert message_summary == "Review this ESP32 schematic image."
+    assert "ESP32 schematic image reference." in context_summaries
     assert repository.get("session:1").messages[0].references == ("image:1",)
 
 

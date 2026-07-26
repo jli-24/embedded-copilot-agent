@@ -21,11 +21,6 @@ from embedded_copilot.multimodal.context import (
     AttachmentBindingNotFound,
     AttachmentBindingRepository,
 )
-from embedded_copilot.schemas.model import (
-    ModelInputType,
-    ModelRequest,
-    ModelTaskType,
-)
 
 _HANDOFFS = {
     ConversationIntent.ARTIFACT_CHANGE: "engineering_agent_review",
@@ -37,20 +32,6 @@ _HANDOFFS = {
     ConversationIntent.FIRMWARE: "firmware_agent_review",
     ConversationIntent.KNOWLEDGE: "knowledge_review",
     ConversationIntent.GENERAL: "general_response",
-}
-_TASKS = {
-    ConversationIntent.CHAT: ModelTaskType.CHAT,
-    ConversationIntent.DEBUG: ModelTaskType.REASONING,
-    ConversationIntent.VISION_ANALYSIS: ModelTaskType.VISION,
-    ConversationIntent.DATASHEET_ANALYSIS: ModelTaskType.REASONING,
-    ConversationIntent.DESIGN_REVIEW: ModelTaskType.REASONING,
-    ConversationIntent.FIRMWARE: ModelTaskType.CODE,
-    ConversationIntent.KNOWLEDGE: ModelTaskType.REASONING,
-    ConversationIntent.GENERAL: ModelTaskType.CHAT,
-}
-_INPUT_TYPES = {
-    ConversationIntent.VISION_ANALYSIS: ModelInputType.IMAGE,
-    ConversationIntent.DATASHEET_ANALYSIS: ModelInputType.FILE,
 }
 _CHANGE_HANDOFF_SUMMARY = (
     "Change intent recorded for independent Engineering Agent validation."
@@ -94,15 +75,11 @@ class ConversationService:
                 isolated_message.content_summary,
                 reference_summaries=tuple(item.input.summary for item in bindings),
             )
-            request = ModelRequest(
-                task_type=_TASKS[intent],
-                input_type=_INPUT_TYPES.get(intent, ModelInputType.TEXT),
-                context_ids=(
-                    isolated_message.session_id,
-                    *isolated_message.references,
-                ),
+            raw_output = await self._reasoning.reason(
+                user_message_summary=model_input.message_summary,
+                context_summaries=model_input.context_summaries,
+                task_intent=intent.value,
             )
-            raw_output = await self._reasoning.reason(request, model_input)
             output = ReasoningOutput.model_validate(
                 copy.deepcopy(raw_output.model_dump(mode="python"))
             )

@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 from embedded_copilot.conversation.context import ContextResolver
 from embedded_copilot.conversation.models import ConversationMessage, ConversationTurn
+from embedded_copilot.conversation.reasoning import ReasoningPort
 from embedded_copilot.conversation.repository import (
     ConversationNotFound,
     ProcessLocalConversationRepository,
@@ -30,7 +31,6 @@ from embedded_copilot.experience.service import (
     ProcessLocalExperienceService,
 )
 from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
-from embedded_copilot.intelligence.models import ModelInput
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
     AttachmentBindingConflict,
@@ -42,14 +42,8 @@ from embedded_copilot.multimodal.models import (
     MultimodalInputType,
 )
 from embedded_copilot.schemas.knowledge_trace import KnowledgeTrace
-from embedded_copilot.schemas.model import ModelRequest
 from embedded_copilot.vision.models import VisionSuggestion
 from embedded_copilot.vision.service import VisionService
-
-
-class _UnavailableReasoningPort:
-    async def reason(self, request: ModelRequest, model_input: ModelInput):
-        raise ModelProviderUnavailable("No reasoning provider is configured")
 
 
 class _UnavailableVisionAdapter:
@@ -216,7 +210,7 @@ class ExperienceRuntime:
     attachment_repository: ProcessLocalAttachmentBindingRepository
 
 
-def build_experience_runtime() -> ExperienceRuntime:
+def build_experience_runtime(*, reasoning: ReasoningPort) -> ExperienceRuntime:
     repository = ProcessLocalConversationRepository()
     attachment_repository = ProcessLocalAttachmentBindingRepository()
     vision_service = VisionService(
@@ -227,7 +221,7 @@ def build_experience_runtime() -> ExperienceRuntime:
         repository=repository,
         context_resolver=ContextResolver(),
         intent_router=IntentRouter(),
-        reasoning=_UnavailableReasoningPort(),
+        reasoning=reasoning,
         attachment_repository=attachment_repository,
     )
     workspace_service = ProcessLocalWorkspaceService(
