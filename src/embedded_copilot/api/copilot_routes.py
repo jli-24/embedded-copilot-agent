@@ -31,7 +31,14 @@ from embedded_copilot.multimodal.context import (
     AttachmentBindingConflict,
     AttachmentBindingNotFound,
 )
-from embedded_copilot.vision.models import VisionSuggestion
+from embedded_copilot.vision_runtime import (
+    ImageType,
+    VisionPort,
+    VisionProviderTimeout,
+    VisionProviderUnavailable,
+    VisionReferenceConflict,
+    VisionRequest,
+)
 
 
 class WorkspaceService(Protocol):
@@ -66,22 +73,16 @@ class WorkspaceService(Protocol):
         trace_id: str,
     ) -> AttachmentBinding: ...
 
-    async def analyze_vision(
-        self,
-        *,
-        session_id: str,
-        reference_id: str,
-        message_summary: str,
-        trace_id: str,
-    ) -> VisionSuggestion: ...
-
-
 def get_workspace_service(request: Request) -> WorkspaceService | None:
     return request.app.state.workspace_service
 
 
 def get_model_status_port(request: Request) -> StatusPort:
     return request.app.state.model_status_port
+
+
+def get_vision_port(request: Request) -> VisionPort | None:
+    return request.app.state.vision_port
 
 
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
@@ -98,19 +99,33 @@ def _map_error(request: Request, error: Exception) -> JSONResponse:
             status_code=404,
             detail="Copilot session was not found.",
         )
-    if isinstance(error, (ConversationStateConflict, AttachmentBindingConflict)):
+    if isinstance(
+        error,
+        (
+            ConversationStateConflict,
+            AttachmentBindingConflict,
+            VisionReferenceConflict,
+        ),
+    ):
         return _error(
             request,
             status_code=409,
             detail="Copilot session state conflict.",
         )
-    if isinstance(error, (ModelProviderUnavailable, ModelGatewayError)):
+    if isinstance(
+        error,
+        (
+            ModelProviderUnavailable,
+            ModelGatewayError,
+            VisionProviderUnavailable,
+        ),
+    ):
         return _error(
             request,
             status_code=503,
             detail="Copilot workspace service is unavailable.",
         )
-    if isinstance(error, TimeoutError):
+    if isinstance(error, (TimeoutError, VisionProviderTimeout)):
         return _error(
             request,
             status_code=504,
@@ -247,21 +262,27 @@ async def analyze_copilot_vision(
     session_id: str,
     payload: CopilotVisionRequest,
     request: Request,
-    service: WorkspaceService | None = Depends(get_workspace_service),
+    port: VisionPort | None = Depends(get_vision_port),
 ) -> CopilotVisionResponse | JSONResponse:
-    if service is None:
+    if port is None:
         return _error(
             request,
             status_code=503,
-            detail="Copilot workspace service is unavailable.",
+            detail="Copilot vision service is unavailable.",
         )
     try:
-        suggestion = await service.analyze_vision(
-            session_id=session_id,
-            reference_id=payload.reference_id,
-            message_summary=payload.message_summary,
-            trace_id=request.state.trace_id,
+        suggestion = await port.analyze(
+            VisionRequest(
+                session_id=session_id,
+                reference_id=payload.reference_id,
+                image_type=ImageType.UNKNOWN,
+                instruction_summary=payload.instruction_summary,
+            )
         )
-        return CopilotVisionResponse(summary=suggestion.summary)
+        return CopilotVisionResponse(
+            type=suggestion.output_type,
+            summary=suggestion.summary,
+            review_required=suggestion.review_required,
+        )
     except Exception as error:
         return _map_error(request, error)

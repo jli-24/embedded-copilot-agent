@@ -6,14 +6,11 @@ from embedded_copilot.multimodal.context import AttachmentBindingRepository
 from embedded_copilot.multimodal.models import MultimodalInputType
 from embedded_copilot.vision_runtime.contracts import (
     VisionPort,
+    VisionReferenceConflict,
     VisionRequest,
     VisionResponse,
 )
 from embedded_copilot.vision_runtime.routing import VisionRouter
-
-
-class VisionReferenceConflict(RuntimeError):
-    """The registered reference cannot be used by the Vision Runtime."""
 
 
 @dataclass(frozen=True, slots=True)

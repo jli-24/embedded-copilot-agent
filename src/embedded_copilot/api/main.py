@@ -26,6 +26,10 @@ from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
 from embedded_copilot.services.experience_runtime import build_experience_runtime
 from embedded_copilot.services.runtime import build_analysis_service, build_runtime
+from embedded_copilot.vision_runtime import (
+    VisionPort,
+    create_vision_runtime,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,7 @@ def create_app(
     analysis_service: ProductAnalysisService | None = None,
     workspace_service: WorkspaceService | None | _UnsetService = _UNSET_SERVICE,
     experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
+    vision_port: VisionPort | None | _UnsetService = _UNSET_SERVICE,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -85,8 +90,20 @@ def create_app(
             )
         else:
             active_experience_service = experience_service
+        if isinstance(vision_port, _UnsetService):
+            active_vision_port: VisionPort | None = (
+                create_vision_runtime(
+                    active_settings,
+                    default_experience_runtime.attachment_repository,
+                ).vision_port()
+                if default_experience_runtime is not None
+                else None
+            )
+        else:
+            active_vision_port = vision_port
         application.state.settings = active_settings
         application.state.model_status_port = model_runtime.status_port()
+        application.state.vision_port = active_vision_port
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:

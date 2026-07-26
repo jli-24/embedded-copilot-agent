@@ -102,6 +102,9 @@ def test_vision_runtime_package_exports_only_stable_contracts_and_facade() -> No
     assert public_runtime.__all__ == [
         "ImageType",
         "VisionPort",
+        "VisionProviderTimeout",
+        "VisionProviderUnavailable",
+        "VisionReferenceConflict",
         "VisionRequest",
         "VisionResponse",
         "VisionRuntime",

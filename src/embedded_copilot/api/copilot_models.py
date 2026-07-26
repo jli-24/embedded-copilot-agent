@@ -164,22 +164,23 @@ class CopilotAttachmentReceipt(CopilotContractModel):
 
 class CopilotVisionRequest(CopilotContractModel):
     reference_id: str
-    message_summary: str
+    instruction_summary: str
 
     @field_validator("reference_id", mode="before")
     @classmethod
     def validate_reference_id(cls, value: object) -> str:
         return safe_identifier(value, field="reference_id")
 
-    @field_validator("message_summary", mode="before")
+    @field_validator("instruction_summary", mode="before")
     @classmethod
-    def validate_message_summary(cls, value: object) -> str:
-        return safe_summary(value, field="message_summary")
+    def validate_instruction_summary(cls, value: object) -> str:
+        return safe_summary(value, field="instruction_summary")
 
 
 class CopilotVisionResponse(CopilotContractModel):
     type: Literal["reasoning_suggestion"] = "reasoning_suggestion"
     summary: str
+    review_required: Literal[True] = True
 
     @field_validator("summary", mode="before")
     @classmethod

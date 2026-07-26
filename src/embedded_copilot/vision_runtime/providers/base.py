@@ -9,18 +9,14 @@ from pydantic import Field, field_serializer, field_validator
 
 from embedded_copilot.intelligence._validation import safe_text
 from embedded_copilot.intelligence.models import IntelligenceContractModel
-from embedded_copilot.vision_runtime.contracts import VisionRequest
+from embedded_copilot.vision_runtime.contracts import (
+    VisionProviderTimeout,
+    VisionProviderUnavailable,
+    VisionRequest,
+)
 
 VisionMetadataValue: TypeAlias = str | float | bool
 _ALLOWED_METADATA = frozenset({"cached", "finish_reason", "latency_ms"})
-
-
-class VisionProviderUnavailable(RuntimeError):
-    """A safe provider-unavailable failure for the API boundary."""
-
-
-class VisionProviderTimeout(TimeoutError):
-    """A safe request-scoped provider timeout."""
 
 
 class VisionCapability(StrEnum):

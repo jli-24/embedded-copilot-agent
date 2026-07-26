@@ -9,7 +9,6 @@ import pytest
 from embedded_copilot.api.main import create_app
 from embedded_copilot.conversation.models import ConversationMessage, ConversationTurn
 from embedded_copilot.copilot.workspace import ProjectWorkspace
-from embedded_copilot.intelligence.exceptions import ModelProviderUnavailable
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
     AttachmentBindingConflict,
@@ -17,7 +16,12 @@ from embedded_copilot.multimodal.context import (
 )
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.services.config import Settings
-from embedded_copilot.vision.models import VisionSuggestion
+from embedded_copilot.vision_runtime import VisionRequest, VisionResponse
+from embedded_copilot.vision_runtime.gateway import VisionReferenceConflict
+from embedded_copilot.vision_runtime.providers import (
+    VisionProviderTimeout,
+    VisionProviderUnavailable,
+)
 
 CREATED = datetime(2026, 7, 26, 12, 0, tzinfo=timezone.utc)
 
@@ -28,8 +32,7 @@ class _ChatService:
 
 
 class _WorkspaceService:
-    def __init__(self, *, outcome: str = "success") -> None:
-        self.outcome = outcome
+    def __init__(self) -> None:
         self.binding: AttachmentBinding | None = None
 
     async def create_session(self, **kwargs: object) -> ProjectWorkspace:
@@ -52,34 +55,27 @@ class _WorkspaceService:
         *,
         trace_id: str,
     ) -> AttachmentBinding:
-        self._raise_if_requested()
         self.binding = binding
         return binding
 
-    async def analyze_vision(
-        self,
-        *,
-        session_id: str,
-        reference_id: str,
-        message_summary: str,
-        trace_id: str,
-    ) -> VisionSuggestion:
-        self._raise_if_requested()
-        return VisionSuggestion(
-            summary="The image may contain an MCU region; confirm during review.",
-            confidence=0.25,
-            source_reference=reference_id,
-        )
+class _VisionPort:
+    def __init__(self, *, outcome: str = "success") -> None:
+        self.outcome = outcome
+        self.request: VisionRequest | None = None
 
-    def _raise_if_requested(self) -> None:
+    async def analyze(self, request: VisionRequest) -> VisionResponse:
+        self.request = request
         error = {
             "missing": AttachmentBindingNotFound("PRIVATE_REFERENCE"),
-            "conflict": AttachmentBindingConflict("PRIVATE_CONFLICT"),
-            "unavailable": ModelProviderUnavailable("PRIVATE_PROVIDER"),
-            "timeout": TimeoutError("PRIVATE_TIMEOUT"),
+            "conflict": VisionReferenceConflict("PRIVATE_CONFLICT"),
+            "unavailable": VisionProviderUnavailable("PRIVATE_PROVIDER"),
+            "timeout": VisionProviderTimeout("PRIVATE_TIMEOUT"),
         }.get(self.outcome)
         if error is not None:
             raise error
+        return VisionResponse(
+            summary="The reference metadata requires engineer review."
+        )
 
 
 async def _request(
@@ -87,11 +83,13 @@ async def _request(
     path: str,
     *,
     service: _WorkspaceService,
+    vision_port: _VisionPort | None = None,
     json: dict[str, object],
 ) -> httpx.Response:
     app = create_app(
         service=_ChatService(),
         workspace_service=service,
+        vision_port=vision_port or _VisionPort(),
         settings=Settings(_env_file=None),
     )
     async with app.router.lifespan_context(app):
@@ -116,6 +114,7 @@ def _attachment_payload() -> dict[str, object]:
 
 def test_attachment_and_vision_routes_return_suggestion_only_contracts() -> None:
     service = _WorkspaceService()
+    vision_port = _VisionPort()
 
     attachment = asyncio.run(
         _request(
@@ -130,9 +129,10 @@ def test_attachment_and_vision_routes_return_suggestion_only_contracts() -> None
             "POST",
             "/api/v1/copilot/sessions/session:1/vision",
             service=service,
+            vision_port=vision_port,
             json={
                 "reference_id": "image:1",
-                "message_summary": "Review the referenced schematic.",
+                "instruction_summary": "Review the referenced schematic.",
             },
         )
     )
@@ -152,8 +152,15 @@ def test_attachment_and_vision_routes_return_suggestion_only_contracts() -> None
     assert vision.status_code == 200
     assert vision.json() == {
         "type": "reasoning_suggestion",
-        "summary": "The image may contain an MCU region; confirm during review.",
+        "summary": "The reference metadata requires engineer review.",
+        "review_required": True,
     }
+    assert vision_port.request == VisionRequest(
+        session_id="session:1",
+        reference_id="image:1",
+        image_type="unknown",
+        instruction_summary="Review the referenced schematic.",
+    )
     assert "artifact_update" not in vision.text
 
 
@@ -208,10 +215,11 @@ def test_multimodal_routes_map_safe_errors(
         _request(
             "POST",
             "/api/v1/copilot/sessions/session:1/vision",
-            service=_WorkspaceService(outcome=outcome),
+            service=_WorkspaceService(),
+            vision_port=_VisionPort(outcome=outcome),
             json={
                 "reference_id": "image:1",
-                "message_summary": "Review the referenced schematic.",
+                "instruction_summary": "Review the referenced schematic.",
             },
         )
     )
@@ -220,8 +228,13 @@ def test_multimodal_routes_map_safe_errors(
     assert "PRIVATE_" not in response.text
 
 
-def test_default_runtime_shares_attachment_reference_with_file_projection() -> None:
-    async def exercise() -> tuple[httpx.Response, httpx.Response, httpx.Response]:
+def test_default_runtime_shares_attachment_reference_with_vision_runtime() -> None:
+    async def exercise() -> tuple[
+        httpx.Response,
+        httpx.Response,
+        httpx.Response,
+        httpx.Response,
+    ]:
         app = create_app(service=_ChatService(), settings=Settings(_env_file=None))
         async with app.router.lifespan_context(app):
             transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
@@ -255,13 +268,22 @@ def test_default_runtime_shares_attachment_reference_with_file_projection() -> N
                 files = await client.get(
                     "/api/v1/copilot/sessions/session:shared/files"
                 )
-                return created, bound, files
+                vision = await client.post(
+                    "/api/v1/copilot/sessions/session:shared/vision",
+                    json={
+                        "reference_id": "image:1",
+                        "instruction_summary": "Review the reference metadata.",
+                    },
+                )
+                return created, bound, files, vision
 
-    created, bound, files = asyncio.run(exercise())
+    created, bound, files, vision = asyncio.run(exercise())
 
     assert created.status_code == 201
     assert bound.status_code == 201
     assert files.status_code == 200
+    assert vision.status_code == 503
+    assert "provider" not in vision.text.casefold()
     assert files.json()["files"] == [
         {
             "file_id": "image:1",
