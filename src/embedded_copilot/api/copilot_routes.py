@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from embedded_copilot.api.copilot_models import (
     CopilotAttachmentReceipt,
     CopilotAttachmentRequest,
+    CopilotFileIntelligenceRequest,
+    CopilotFileIntelligenceResponse,
     CopilotMessageRequest,
     CopilotModelStatusResponse,
     CopilotSessionCreateRequest,
@@ -21,6 +23,15 @@ from embedded_copilot.conversation.repository import (
     ConversationStateConflict,
 )
 from embedded_copilot.copilot.workspace import ProjectWorkspace
+from embedded_copilot.file_runtime import (
+    FileAnalysisTimeout,
+    FileIntelligencePort,
+    FileReferenceConflict,
+    FileReferenceNotFound,
+    FileReferenceRequest,
+    FileRuntimeUnavailable,
+    FileType,
+)
 from embedded_copilot.intelligence.exceptions import (
     ModelGatewayError,
     ModelProviderUnavailable,
@@ -86,6 +97,10 @@ def get_vision_port(request: Request) -> VisionPort | None:
     return request.app.state.vision_port
 
 
+def get_file_port(request: Request) -> FileIntelligencePort | None:
+    return request.app.state.file_port
+
+
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -132,6 +147,28 @@ def _map_error(request: Request, error: Exception) -> JSONResponse:
             status_code=504,
             detail="Copilot workspace request timed out.",
         )
+    raise error
+
+
+def _file_error(request: Request, *, status_code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "error": "file_unavailable",
+            "trace_id": request.state.trace_id,
+        },
+    )
+
+
+def _map_file_error(request: Request, error: Exception) -> JSONResponse:
+    if isinstance(error, FileReferenceNotFound):
+        return _file_error(request, status_code=404)
+    if isinstance(error, FileReferenceConflict):
+        return _file_error(request, status_code=409)
+    if isinstance(error, FileRuntimeUnavailable):
+        return _file_error(request, status_code=503)
+    if isinstance(error, FileAnalysisTimeout):
+        return _file_error(request, status_code=504)
     raise error
 
 
@@ -287,3 +324,33 @@ async def analyze_copilot_vision(
         )
     except Exception as error:
         return _map_error(request, error)
+
+
+@router.post(
+    "/sessions/{session_id}/files/analyze",
+    response_model=CopilotFileIntelligenceResponse,
+)
+async def analyze_copilot_file(
+    session_id: str,
+    payload: CopilotFileIntelligenceRequest,
+    request: Request,
+    port: FileIntelligencePort | None = Depends(get_file_port),
+) -> CopilotFileIntelligenceResponse | JSONResponse:
+    if port is None:
+        return _file_error(request, status_code=503)
+    try:
+        suggestion = await port.analyze(
+            FileReferenceRequest(
+                session_id=session_id,
+                file_id=payload.file_id,
+                file_type=FileType.UNKNOWN,
+                instruction_summary=payload.instruction_summary,
+            )
+        )
+        return CopilotFileIntelligenceResponse(
+            type=suggestion.output_type,
+            summary=suggestion.summary,
+            review_required=suggestion.review_required,
+        )
+    except Exception as error:
+        return _map_file_error(request, error)

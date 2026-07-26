@@ -188,6 +188,32 @@ class CopilotVisionResponse(CopilotContractModel):
         return safe_summary(value, field="summary")
 
 
+class CopilotFileIntelligenceRequest(CopilotContractModel):
+    file_id: str
+    instruction_summary: str
+
+    @field_validator("file_id", mode="before")
+    @classmethod
+    def validate_file_id(cls, value: object) -> str:
+        return safe_identifier(value, field="file_id")
+
+    @field_validator("instruction_summary", mode="before")
+    @classmethod
+    def validate_instruction_summary(cls, value: object) -> str:
+        return safe_summary(value, field="instruction_summary")
+
+
+class CopilotFileIntelligenceResponse(CopilotContractModel):
+    type: Literal["reasoning_suggestion"] = "reasoning_suggestion"
+    summary: str
+    review_required: Literal[True] = True
+
+    @field_validator("summary", mode="before")
+    @classmethod
+    def validate_summary(cls, value: object) -> str:
+        return safe_summary(value, field="summary")
+
+
 class CopilotModelStatusResponse(ContractModel):
     provider: str
     status: Literal["available", "unavailable"]

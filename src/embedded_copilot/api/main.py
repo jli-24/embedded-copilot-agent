@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -19,7 +20,14 @@ from embedded_copilot.api.experience_routes import (
     ExperienceService,
     router as experience_router,
 )
+from embedded_copilot.api.file_reference_catalog import (
+    CopilotFileReferenceCatalog,
+)
 from embedded_copilot.api.routes import ChatService, ProductAnalysisService, router
+from embedded_copilot.file_runtime import (
+    FileIntelligencePort,
+    create_file_runtime,
+)
 from embedded_copilot.model_runtime import create_model_runtime
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
@@ -66,6 +74,8 @@ def create_app(
     workspace_service: WorkspaceService | None | _UnsetService = _UNSET_SERVICE,
     experience_service: ExperienceService | None | _UnsetService = _UNSET_SERVICE,
     vision_port: VisionPort | None | _UnsetService = _UNSET_SERVICE,
+    file_port: FileIntelligencePort | None | _UnsetService = _UNSET_SERVICE,
+    file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -101,9 +111,24 @@ def create_app(
             )
         else:
             active_vision_port = vision_port
+        if isinstance(file_port, _UnsetService):
+            active_file_port: FileIntelligencePort | None = (
+                create_file_runtime(
+                    active_settings,
+                    CopilotFileReferenceCatalog(
+                        default_experience_runtime.attachment_repository,
+                        file_reference_paths or {},
+                    ),
+                ).file_port()
+                if default_experience_runtime is not None
+                else None
+            )
+        else:
+            active_file_port = file_port
         application.state.settings = active_settings
         application.state.model_status_port = model_runtime.status_port()
         application.state.vision_port = active_vision_port
+        application.state.file_port = active_file_port
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:

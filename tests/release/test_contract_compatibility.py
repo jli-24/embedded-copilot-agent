@@ -102,6 +102,7 @@ def test_fastapi_public_paths_and_methods_remain_compatible() -> None:
         "/api/v1/copilot/sessions/{session_id}/workspace": ("get",),
         "/api/v1/copilot/sessions/{session_id}/artifact-view": ("get",),
         "/api/v1/copilot/sessions/{session_id}/files": ("get",),
+        "/api/v1/copilot/sessions/{session_id}/files/analyze": ("post",),
         "/api/v1/copilot/sessions/{session_id}/progress": ("get",),
         "/api/v1/copilot/sessions/{session_id}/review": ("post",),
     }
