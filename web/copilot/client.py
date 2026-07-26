@@ -128,6 +128,9 @@ class CopilotExperienceClient:
             },
         )
 
+    def get_model_status(self) -> JsonObject:
+        return self._request("GET", "/api/v1/copilot/models/status")
+
     def record_review(
         self,
         session_id: str,

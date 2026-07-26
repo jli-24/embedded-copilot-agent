@@ -250,6 +250,7 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
             comment_summary=None,
             timestamp="2026-07-26T08:02:00Z",
         )
+        client.get_model_status()
     finally:
         client.close()
 
@@ -262,14 +263,51 @@ def test_client_uses_only_additive_copilot_api_routes() -> None:
         ("POST", "/api/v1/copilot/sessions/session:1/attachments"),
         ("POST", "/api/v1/copilot/sessions/session:1/vision"),
         ("POST", "/api/v1/copilot/sessions/session:1/review"),
+        ("GET", "/api/v1/copilot/models/status"),
     ]
-    review_payload = json.loads(requests[-1].content)
+    review_payload = json.loads(requests[-2].content)
     assert review_payload["timestamp"] == "2026-07-26T08:02:00Z"
     assert "created_at" not in review_payload
     assert "source" not in review_payload
     assert not hasattr(client, "download")
     assert not hasattr(client, "open")
     assert not hasattr(client, "preview")
+
+
+def test_model_status_page_loads_request_time_status_without_session_state() -> None:
+    app = AppTest.from_string(
+        """
+import web.copilot.app_pages.model_status as model_status_page
+
+class Client:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return None
+
+    def get_model_status(self):
+        return {
+            "provider": "ollama",
+            "status": "available",
+            "capabilities": ["CHAT", "CODE", "REASONING"],
+            "model": "edge-model:latest",
+        }
+
+model_status_page.api_client = lambda: Client()
+model_status_page.render()
+""",
+    )
+    app.run(timeout=15)
+
+    assert not app.exception
+    assert app.title[0].value == "Model Status"
+    assert tuple((item.label, item.value) for item in app.metric) == (
+        ("Provider", "ollama"),
+        ("Status", "available"),
+        ("Model", "edge-model:latest"),
+    )
+    assert set(app.session_state.filtered_state) == set()
 
 
 def test_client_does_not_route_internal_api_calls_through_environment_proxy(

@@ -17,6 +17,7 @@ from embedded_copilot.multimodal.models import (
     MultimodalInput,
     MultimodalInputType,
 )
+from embedded_copilot.schemas.result import ContractModel
 
 
 class CopilotSessionCreateRequest(CopilotContractModel):
@@ -184,3 +185,10 @@ class CopilotVisionResponse(CopilotContractModel):
     @classmethod
     def validate_summary(cls, value: object) -> str:
         return safe_summary(value, field="summary")
+
+
+class CopilotModelStatusResponse(ContractModel):
+    provider: str
+    status: Literal["available", "unavailable"]
+    capabilities: tuple[str, ...]
+    model: str | None

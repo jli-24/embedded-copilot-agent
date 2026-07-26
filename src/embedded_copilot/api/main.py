@@ -86,6 +86,7 @@ def create_app(
         else:
             active_experience_service = experience_service
         application.state.settings = active_settings
+        application.state.model_status_port = model_runtime.status_port()
         application.state.workspace_service = active_workspace_service
         application.state.experience_service = active_experience_service
         if service is not None:

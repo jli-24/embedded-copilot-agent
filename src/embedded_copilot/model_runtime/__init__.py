@@ -1,6 +1,6 @@
 """Framework-independent model runtime infrastructure."""
 
 from embedded_copilot.model_runtime.composition.runtime import create_model_runtime
-from embedded_copilot.model_runtime.facade import ModelRuntime
+from embedded_copilot.model_runtime.facade import ModelRuntime, StatusPort
 
-__all__ = ["ModelRuntime", "create_model_runtime"]
+__all__ = ["ModelRuntime", "StatusPort", "create_model_runtime"]

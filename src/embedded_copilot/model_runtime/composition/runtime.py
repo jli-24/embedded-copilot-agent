@@ -9,6 +9,10 @@ from embedded_copilot.model_runtime.composition.config import (
 from embedded_copilot.model_runtime.facade import ModelRuntime
 from embedded_copilot.model_runtime.gateway.model import ModelGateway
 from embedded_copilot.model_runtime.gateway.reasoning import GatewayReasoningPort
+from embedded_copilot.model_runtime.health.status import (
+    OllamaStatusPort,
+    UnavailableStatusPort,
+)
 from embedded_copilot.model_runtime.providers.base import ModelProvider
 from embedded_copilot.model_runtime.providers.ollama import OllamaProvider
 from embedded_copilot.model_runtime.registry import ProviderRegistry
@@ -22,6 +26,7 @@ def create_model_runtime(
 ) -> ModelRuntime:
     config = load_model_runtime_config(settings)
     providers: tuple[ModelProvider, ...] = ()
+    status = UnavailableStatusPort()
     if config.provider == "ollama":
         if config.base_url is None or config.model is None:
             raise ValueError("model runtime configuration is invalid")
@@ -33,7 +38,13 @@ def create_model_runtime(
                 transport=transport,
             ),
         )
+        status = OllamaStatusPort(
+            config.base_url,
+            config.model,
+            config.timeout_seconds,
+            transport,
+        )
     registry = ProviderRegistry(providers)
     router = ModelRouter(registry)
     gateway = ModelGateway(router)
-    return ModelRuntime(GatewayReasoningPort(gateway))
+    return ModelRuntime(GatewayReasoningPort(gateway), status)

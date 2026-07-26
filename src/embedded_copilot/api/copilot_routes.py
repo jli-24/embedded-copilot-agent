@@ -10,6 +10,7 @@ from embedded_copilot.api.copilot_models import (
     CopilotAttachmentReceipt,
     CopilotAttachmentRequest,
     CopilotMessageRequest,
+    CopilotModelStatusResponse,
     CopilotSessionCreateRequest,
     CopilotVisionRequest,
     CopilotVisionResponse,
@@ -24,6 +25,7 @@ from embedded_copilot.intelligence.exceptions import (
     ModelGatewayError,
     ModelProviderUnavailable,
 )
+from embedded_copilot.model_runtime import StatusPort
 from embedded_copilot.multimodal.context import (
     AttachmentBinding,
     AttachmentBindingConflict,
@@ -78,6 +80,10 @@ def get_workspace_service(request: Request) -> WorkspaceService | None:
     return request.app.state.workspace_service
 
 
+def get_model_status_port(request: Request) -> StatusPort:
+    return request.app.state.model_status_port
+
+
 def _error(request: Request, *, status_code: int, detail: str) -> JSONResponse:
     return JSONResponse(
         status_code=status_code,
@@ -114,6 +120,22 @@ def _map_error(request: Request, error: Exception) -> JSONResponse:
 
 
 router = APIRouter(prefix="/api/v1/copilot")
+
+
+@router.get(
+    "/models/status",
+    response_model=CopilotModelStatusResponse,
+)
+async def get_model_status(
+    port: StatusPort = Depends(get_model_status_port),
+) -> CopilotModelStatusResponse:
+    result = await port.status()
+    return CopilotModelStatusResponse(
+        provider=result.provider,
+        status=result.status,
+        capabilities=result.capabilities,
+        model=result.model,
+    )
 
 
 @router.post(
