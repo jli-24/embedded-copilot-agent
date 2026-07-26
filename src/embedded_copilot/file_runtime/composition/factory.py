@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TypeVar
+
+from pydantic import BaseModel
 
 from embedded_copilot.file_runtime.contracts import (
     DocumentSummary,
     Extractor,
+    FileExtractionPort,
     FileIntelligencePort,
     FileIntelligenceResponse,
     FileReference,
     FileReferenceCatalog,
     FileReferenceRequest,
     FileType,
+    ReadOnlyExtractor,
 )
 from embedded_copilot.file_runtime.contracts.models import format_document_summary
 from embedded_copilot.file_runtime.exceptions import (
@@ -27,6 +32,8 @@ from embedded_copilot.file_runtime.security.policy import (
     load_file_security_policy,
 )
 
+ExtractionResultT = TypeVar("ExtractionResultT", bound=BaseModel)
+
 
 class _UnavailableFilePort:
     async def analyze(
@@ -34,6 +41,43 @@ class _UnavailableFilePort:
         request: FileReferenceRequest,
     ) -> FileIntelligenceResponse:
         raise FileRuntimeUnavailable()
+
+
+class _UnavailableExtractionPort:
+    async def extract(
+        self,
+        request: FileReferenceRequest,
+        extractor: ReadOnlyExtractor[ExtractionResultT],
+        *,
+        result_type: type[ExtractionResultT],
+    ) -> ExtractionResultT:
+        raise FileRuntimeUnavailable()
+
+
+class _SecureExtractionPort:
+    __slots__ = ("_reader",)
+
+    def __init__(self, reader: SecureFileReader) -> None:
+        self._reader = reader
+
+    async def extract(
+        self,
+        request: FileReferenceRequest,
+        extractor: ReadOnlyExtractor[ExtractionResultT],
+        *,
+        result_type: type[ExtractionResultT],
+    ) -> ExtractionResultT:
+        try:
+            return await asyncio.to_thread(
+                self._reader.extract_model,
+                request,
+                extractor,
+                result_type=result_type,
+            )
+        except FileRuntimeError:
+            raise
+        except Exception:
+            raise FileRuntimeUnavailable() from None
 
 
 class _StructuralExtractor:
@@ -96,8 +140,10 @@ def create_file_runtime(
 ) -> FileRuntime:
     policy = load_file_security_policy(settings)
     port: FileIntelligencePort
+    extraction_port: FileExtractionPort
     if policy.workspace_root is None:
         port = _UnavailableFilePort()
+        extraction_port = _UnavailableExtractionPort()
     else:
         resolver = RootedFileResolver(policy.workspace_root, catalog)
         reader = SecureFileReader(
@@ -108,4 +154,5 @@ def create_file_runtime(
             reader,
             _StructuralExtractor(max_size_bytes=policy.max_size_bytes),
         )
-    return FileRuntime._compose(port)
+        extraction_port = _SecureExtractionPort(reader)
+    return FileRuntime._compose(port, extraction_port)

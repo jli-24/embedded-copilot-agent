@@ -4,6 +4,7 @@ import asyncio
 from pathlib import Path
 
 import pytest
+from pydantic import BaseModel, ConfigDict
 
 from embedded_copilot.file_runtime import (
     FileReference,
@@ -28,6 +29,22 @@ class _Catalog:
         ):
             return None
         return self._reference.model_copy(deep=True)
+
+
+class _CandidateResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    file_id: str
+    semantics: str
+
+
+class _CandidateExtractor:
+    def extract(self, stream, *, reference):
+        assert stream.read()
+        return _CandidateResult(
+            file_id=reference.file_id,
+            semantics="candidate",
+        )
 
 
 def _request(file_type: FileType = FileType.UNKNOWN) -> FileReferenceRequest:
@@ -76,6 +93,52 @@ def test_factory_composes_structural_file_port_without_runtime_leaks(
     ):
         assert not hasattr(runtime, forbidden)
         assert not hasattr(runtime.file_port(), forbidden)
+
+
+def test_factory_composes_typed_read_only_extraction_port(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "main.c"
+    source.write_bytes(b"int value;\n")
+    reference = FileReference(
+        session_id="session:1",
+        file_id="file:1",
+        basename=source.name,
+        document_type=FileType.SOURCE_CODE,
+        size_bytes=source.stat().st_size,
+        relative_path=source.name,
+    )
+    runtime = create_file_runtime(
+        Settings(
+            _env_file=None,
+            file_workspace_root=tmp_path,
+            file_max_size_bytes=1024,
+        ),
+        _Catalog(reference),
+    )
+
+    result = asyncio.run(
+        runtime.extraction_port().extract(
+            _request(),
+            _CandidateExtractor(),
+            result_type=_CandidateResult,
+        )
+    )
+
+    assert result == _CandidateResult(
+        file_id="file:1",
+        semantics="candidate",
+    )
+    assert result is not _CandidateExtractor
+    for forbidden in (
+        "read",
+        "open",
+        "path",
+        "stream",
+        "write",
+        "execute",
+    ):
+        assert not hasattr(runtime.extraction_port(), forbidden)
 
 
 def test_factory_defaults_to_unavailable_when_root_is_not_configured() -> None:

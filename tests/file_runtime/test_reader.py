@@ -199,6 +199,35 @@ def test_reader_rejects_mismatched_document_type(tmp_path: Path) -> None:
         reader.extract(_request(), _Extractor())
 
 
+def test_reader_accepts_windows_ctime_settling_at_descriptor_open(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import embedded_copilot.file_runtime.reader.resolver as resolver_module
+
+    source = tmp_path / "main.py"
+    source.write_bytes(b"line one\nline two\n")
+    original_snapshot = resolver_module._file_snapshot
+    calls = 0
+
+    def settling_snapshot(value: os.stat_result):
+        nonlocal calls
+        calls += 1
+        snapshot = original_snapshot(value)
+        if calls in {3, 4}:
+            return (*snapshot[:-1], snapshot[-1] - 1)
+        return snapshot
+
+    monkeypatch.setattr(resolver_module, "_file_snapshot", settling_snapshot)
+    reader = SecureFileReader(
+        RootedFileResolver(tmp_path, _Catalog(_reference(source)))
+    )
+
+    summary = reader.extract(_request(), _Extractor())
+
+    assert summary.file_id == "file:1"
+
+
 def test_resolver_rejects_leaf_descriptor_from_replaced_parent(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

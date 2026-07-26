@@ -3,12 +3,15 @@ from __future__ import annotations
 import os
 import stat
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, TypeVar
+
+from pydantic import BaseModel
 
 from embedded_copilot.file_runtime.contracts import (
     DocumentSummary,
     Extractor,
     FileReferenceRequest,
+    ReadOnlyExtractor,
 )
 from embedded_copilot.file_runtime.exceptions import (
     FileReferenceConflict,
@@ -19,9 +22,11 @@ from embedded_copilot.file_runtime.reader.resolver import (
     FileSnapshot,
     RootedFileResolver,
     _file_snapshot,
+    _stable_file_identity,
 )
 
 DEFAULT_MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
+ExtractionResultT = TypeVar("ExtractionResultT", bound=BaseModel)
 
 
 class _BoundedReadStream:
@@ -79,12 +84,35 @@ class SecureFileReader:
         request: FileReferenceRequest,
         extractor: Extractor,
     ) -> DocumentSummary:
+        return self.extract_model(
+            request,
+            extractor,
+            result_type=DocumentSummary,
+        )
+
+    def extract_model(
+        self,
+        request: FileReferenceRequest,
+        extractor: ReadOnlyExtractor[ExtractionResultT],
+        *,
+        result_type: type[ExtractionResultT],
+    ) -> ExtractionResultT:
+        if (
+            not isinstance(result_type, type)
+            or not issubclass(result_type, BaseModel)
+            or result_type.model_config.get("frozen") is not True
+            or result_type.model_config.get("extra") != "forbid"
+        ):
+            raise FileRuntimeUnavailable()
         resolved = self._resolver.resolve(request)
         reference = resolved.reference
         path = resolved.path
         descriptor = resolved.descriptor
         try:
-            _validate_path_snapshots(resolved.snapshots)
+            _validate_path_snapshots(
+                resolved.snapshots,
+                allowed_leaf_ctimes=resolved.leaf_ctimes,
+            )
             opened = os.fstat(descriptor)
             expected = resolved.snapshots[-1][1]
             if (
@@ -102,7 +130,7 @@ class SecureFileReader:
                     size_bytes=reference.size_bytes,
                 )
                 try:
-                    raw_summary = extractor.extract(
+                    raw_result = extractor.extract(
                         bounded_stream,
                         reference=reference,
                     )
@@ -116,33 +144,63 @@ class SecureFileReader:
                     after = path.lstat()
                 except Exception:
                     raise FileReferenceConflict() from None
+                after_snapshot = _file_snapshot(after)
                 if (
                     _file_snapshot(completed) != _file_snapshot(opened)
-                    or _file_snapshot(after) != expected
+                    or _stable_file_identity(after_snapshot)
+                    != _stable_file_identity(expected)
+                    or after_snapshot[-1] not in resolved.leaf_ctimes
                 ):
                     raise FileReferenceConflict()
-                _validate_path_snapshots(resolved.snapshots)
+            _validate_path_snapshots(
+                resolved.snapshots,
+                allowed_leaf_ctimes=resolved.leaf_ctimes,
+            )
         finally:
             if descriptor >= 0:
                 os.close(descriptor)
 
-        if not isinstance(raw_summary, DocumentSummary):
+        if type(raw_result) is not result_type:
             raise FileRuntimeUnavailable()
-        summary = raw_summary.model_copy(deep=True)
+        result = raw_result.model_copy(deep=True)
+        result_file_id = getattr(result, "file_id", None)
         if (
-            summary.file_id.casefold() != reference.file_id.casefold()
-            or summary.document_type is not reference.document_type
+            result_file_id is not None
+            and (
+                not isinstance(result_file_id, str)
+                or result_file_id.casefold() != reference.file_id.casefold()
+            )
         ):
             raise FileReferenceConflict()
-        return summary
+        result_document_type = getattr(result, "document_type", None)
+        if (
+            result_document_type is not None
+            and result_document_type is not reference.document_type
+        ):
+            raise FileReferenceConflict()
+        return result
 
 
 def _validate_path_snapshots(
     snapshots: tuple[tuple[Path, FileSnapshot], ...],
+    *,
+    allowed_leaf_ctimes: frozenset[int] | None = None,
 ) -> None:
     try:
-        for path, expected in snapshots:
-            if _file_snapshot(path.lstat()) != expected:
+        last_index = len(snapshots) - 1
+        for index, (path, expected) in enumerate(snapshots):
+            actual = _file_snapshot(path.lstat())
+            if actual == expected:
+                continue
+            if (
+                allowed_leaf_ctimes is not None
+                and index == last_index
+                and _stable_file_identity(actual)
+                == _stable_file_identity(expected)
+                and actual[-1] in allowed_leaf_ctimes
+            ):
+                continue
+            if actual != expected:
                 raise FileReferenceConflict()
     except FileRuntimeError:
         raise

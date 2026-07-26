@@ -9,6 +9,7 @@ from pydantic import ValidationError
 
 from embedded_copilot.file_runtime import (
     DocumentSummary,
+    FileExtractionPort,
     FileIntelligencePort,
     FileIntelligenceResponse,
     FileReference,
@@ -27,6 +28,11 @@ class _Port:
         return FileIntelligenceResponse(
             summary="TEXT file structure: 2 lines, 12 characters."
         )
+
+
+class _ExtractionPort:
+    async def extract(self, request, extractor, *, result_type):
+        raise AssertionError("unused extraction port")
 
 
 def test_file_reference_request_rejects_infrastructure_fields() -> None:
@@ -127,8 +133,12 @@ def test_ports_are_read_only_and_facade_hides_runtime_internals() -> None:
         if callable(value) and not name.startswith("_")
     } == {"analyze"}
     assert get_type_hints(FileRuntime.file_port)["return"] is FileIntelligencePort
+    assert (
+        get_type_hints(FileRuntime.extraction_port)["return"]
+        is FileExtractionPort
+    )
 
-    runtime = FileRuntime._compose(_Port())
+    runtime = FileRuntime._compose(_Port(), _ExtractionPort())
     response = asyncio.run(
         runtime.file_port().analyze(
             FileReferenceRequest(

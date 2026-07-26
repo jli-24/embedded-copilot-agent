@@ -24,7 +24,13 @@ FileSnapshot = tuple[int, int, int, int, int, int]
 
 
 class ResolvedFile:
-    __slots__ = ("descriptor", "path", "reference", "snapshots")
+    __slots__ = (
+        "descriptor",
+        "leaf_ctimes",
+        "path",
+        "reference",
+        "snapshots",
+    )
 
     def __init__(
         self,
@@ -32,11 +38,13 @@ class ResolvedFile:
         path: Path,
         snapshots: tuple[tuple[Path, FileSnapshot], ...],
         descriptor: int,
+        leaf_ctimes: frozenset[int],
     ) -> None:
         self.reference = reference
         self.path = path
         self.snapshots = snapshots
         self.descriptor = descriptor
+        self.leaf_ctimes = leaf_ctimes
 
 
 class RootedFileResolver:
@@ -130,11 +138,24 @@ class RootedFileResolver:
             raise FileReferenceConflict() from None
         try:
             opened = os.fstat(descriptor)
+            opened_snapshot = _file_snapshot(opened)
+            path_snapshot = _file_snapshot(resolved.lstat())
+            leaf_ctimes = frozenset(
+                {
+                    snapshots[-1][1][-1],
+                    opened_snapshot[-1],
+                }
+            )
             if (
                 not stat.S_ISREG(opened.st_mode)
-                or _file_snapshot(opened) != snapshots[-1][1]
+                or _stable_file_identity(opened_snapshot)
+                != _stable_file_identity(snapshots[-1][1])
+                or _stable_file_identity(path_snapshot)
+                != _stable_file_identity(opened_snapshot)
+                or path_snapshot[-1] not in leaf_ctimes
             ):
                 raise FileReferenceConflict()
+            snapshots[-1] = (resolved, opened_snapshot)
         except Exception:
             os.close(descriptor)
             raise
@@ -143,6 +164,7 @@ class RootedFileResolver:
             resolved,
             tuple(snapshots),
             descriptor,
+            leaf_ctimes,
         )
 
 
@@ -166,3 +188,7 @@ def _file_snapshot(value: os.stat_result) -> FileSnapshot:
         value.st_mtime_ns,
         value.st_ctime_ns,
     )
+
+
+def _stable_file_identity(snapshot: FileSnapshot) -> tuple[int, int, int, int, int]:
+    return snapshot[:5]

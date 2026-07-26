@@ -2,6 +2,7 @@
 
 from embedded_copilot.file_runtime.contracts import (
     DocumentSummary,
+    FileExtractionPort,
     FileIntelligencePort,
     FileIntelligenceResponse,
     FileReference,
@@ -22,6 +23,7 @@ from embedded_copilot.file_runtime.facade import FileRuntime
 __all__ = [
     "DocumentSummary",
     "FileAnalysisTimeout",
+    "FileExtractionPort",
     "FileIntelligencePort",
     "FileIntelligenceResponse",
     "FileReference",

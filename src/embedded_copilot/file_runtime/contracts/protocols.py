@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import BinaryIO, Protocol, runtime_checkable
+from typing import BinaryIO, Protocol, TypeVar, runtime_checkable
+
+from pydantic import BaseModel
 
 from embedded_copilot.file_runtime.contracts.models import (
     DocumentSummary,
@@ -8,6 +10,8 @@ from embedded_copilot.file_runtime.contracts.models import (
     FileReference,
     FileReferenceRequest,
 )
+
+ExtractionResultT = TypeVar("ExtractionResultT", bound=BaseModel)
 
 
 @runtime_checkable
@@ -23,10 +27,25 @@ class FileReferenceCatalog(Protocol):
     def resolve(self, session_id: str, file_id: str) -> FileReference | None: ...
 
 
-class Extractor(Protocol):
+class ReadOnlyExtractor(Protocol[ExtractionResultT]):
     def extract(
         self,
         stream: BinaryIO,
         *,
         reference: FileReference,
-    ) -> DocumentSummary: ...
+    ) -> ExtractionResultT: ...
+
+
+class Extractor(ReadOnlyExtractor[DocumentSummary], Protocol):
+    """A structural extractor retained for File Intelligence compatibility."""
+
+
+@runtime_checkable
+class FileExtractionPort(Protocol):
+    async def extract(
+        self,
+        request: FileReferenceRequest,
+        extractor: ReadOnlyExtractor[ExtractionResultT],
+        *,
+        result_type: type[ExtractionResultT],
+    ) -> ExtractionResultT: ...
