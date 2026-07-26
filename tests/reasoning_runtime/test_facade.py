@@ -67,5 +67,6 @@ def test_package_has_exact_public_exports() -> None:
         "RuleResult",
         "SourceType",
         "SupportingReference",
+        "build_reasoning_context_snapshot",
         "create_reasoning_runtime",
     ]

@@ -162,7 +162,72 @@ class ReasoningContextSnapshot(_ReasoningContract):
     def validate_source_alignment(self) -> "ReasoningContextSnapshot":
         if len(self.reference_ids) != len(self.source_types):
             raise ValueError("snapshot source types are misaligned")
+        sources = {
+            reference.casefold(): source
+            for reference, source in zip(
+                self.reference_ids,
+                self.source_types,
+                strict=True,
+            )
+        }
+        datasheets = _projection_ids(
+            self.datasheet_candidates,
+            attribute="file_id",
+            field="datasheet candidate",
+        )
+        files = _projection_ids(
+            self.file_summaries,
+            attribute="file_id",
+            field="file summary",
+        )
+        vision = _projection_ids(
+            self.vision_refs,
+            attribute="reference_id",
+            field="vision reference",
+        )
+        for reference, source in sources.items():
+            if source is SourceType.DATASHEET:
+                valid = reference in datasheets and reference in files
+            elif source is SourceType.FILE:
+                valid = reference in files and reference not in datasheets
+            else:
+                valid = reference in vision
+            if not valid:
+                raise ValueError("snapshot projection does not match source type")
+        if (
+            set(datasheets) - set(sources)
+            or set(files) - set(sources)
+            or set(vision) - set(sources)
+        ):
+            raise ValueError("snapshot projection is not referenced")
+        # Import here so basic field validation always precedes fingerprint trust.
+        from embedded_copilot.reasoning_runtime.snapshot import snapshot_fingerprint
+
+        expected = snapshot_fingerprint(
+            schema_version=self.schema_version,
+            context_id=self.context_id,
+            task_intent=self.task_intent,
+            reference_ids=self.reference_ids,
+            source_types=self.source_types,
+            datasheet_candidates=self.datasheet_candidates,
+            file_summaries=self.file_summaries,
+            vision_refs=self.vision_refs,
+        )
+        if self.snapshot_fingerprint != expected:
+            raise ValueError("snapshot_fingerprint does not match snapshot")
         return self
+
+
+def _projection_ids(
+    items: Sequence[object],
+    *,
+    attribute: str,
+    field: str,
+) -> tuple[str, ...]:
+    identifiers = tuple(getattr(item, attribute).casefold() for item in items)
+    if len(set(identifiers)) != len(identifiers):
+        raise ValueError(f"{field} must be unique")
+    return identifiers
 
 
 class ReasoningRequest(_ReasoningContract):

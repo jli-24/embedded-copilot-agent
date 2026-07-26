@@ -24,6 +24,9 @@ from embedded_copilot.reasoning_runtime.exceptions import (
     ReasoningRuntimeUnavailable,
 )
 from embedded_copilot.reasoning_runtime.facade import ReasoningRuntime
+from embedded_copilot.reasoning_runtime.snapshot import (
+    build_reasoning_context_snapshot,
+)
 
 __all__ = [
     "CapabilityEntry",
@@ -45,5 +48,6 @@ __all__ = [
     "RuleResult",
     "SourceType",
     "SupportingReference",
+    "build_reasoning_context_snapshot",
     "create_reasoning_runtime",
 ]

@@ -12,20 +12,34 @@ from embedded_copilot.reasoning_runtime import (
     ReasoningRequest,
     ReasoningTrace,
     RuleResult,
-    SourceType,
+    build_reasoning_context_snapshot,
     create_reasoning_runtime,
 )
+from embedded_copilot.context_runtime.contracts import (
+    EngineeringContextRequest,
+    EngineeringContextResponse,
+    EngineeringContextSummary,
+)
 
-FINGERPRINT = f"sha256:{'0' * 64}"
+CONTEXT_ID = "context:0123456789abcdef01234567"
 
 
 def _snapshot() -> ReasoningContextSnapshot:
-    return ReasoningContextSnapshot(
-        snapshot_fingerprint=FINGERPRINT,
-        context_id="context:0123456789abcdef01234567",
+    request = EngineeringContextRequest(
+        session_id="session:1",
         task_intent="Review the supplied engineering context.",
-        reference_ids=("file:1",),
-        source_types=(SourceType.FILE,),
+        reference_ids=(),
+    )
+    response = EngineeringContextResponse(
+        context_summary=EngineeringContextSummary(
+            context_id=CONTEXT_ID,
+            task_intent=request.task_intent,
+        )
+    )
+    return build_reasoning_context_snapshot(
+        request,
+        response,
+        expected_context_id=CONTEXT_ID,
     )
 
 
@@ -44,16 +58,16 @@ def test_snapshot_requires_versioned_aligned_safe_sources() -> None:
     with pytest.raises(ValidationError):
         ReasoningContextSnapshot(
             schema_version="2.0",  # type: ignore[arg-type]
-            snapshot_fingerprint=FINGERPRINT,
-            context_id="context:0123456789abcdef01234567",
+            snapshot_fingerprint=f"sha256:{'0' * 64}",
+            context_id=CONTEXT_ID,
             task_intent="Review context.",
-            reference_ids=("file:1",),
+            reference_ids=(),
             source_types=(),
         )
     with pytest.raises(ValidationError):
         ReasoningContextSnapshot(
             snapshot_fingerprint="invalid",
-            context_id="context:0123456789abcdef01234567",
+            context_id=CONTEXT_ID,
             task_intent="Review context.",
             reference_ids=(),
             source_types=(),
@@ -71,7 +85,7 @@ def test_rule_trace_records_version_source_and_request_trace() -> None:
     trace = ReasoningTrace(
         trace_id="trace:1",
         context_id=_snapshot().context_id,
-        snapshot_fingerprint=FINGERPRINT,
+        snapshot_fingerprint=_snapshot().snapshot_fingerprint,
         capabilities_applied=(CapabilityEntry(name="context_analysis"),),
         rules_applied=(rule,),
         generated_sections=("summary", "risk"),
@@ -118,5 +132,6 @@ def test_foundation_runtime_returns_review_required_canonical_response() -> None
 
     assert response.output_type == "reasoning_suggestion"
     assert response.reasoning_summary.presentation_summary is None
+    assert response.reasoning_summary.confidence == "low"
     assert response.trace.trace_id == "trace:1"
     assert response.review_required is True
