@@ -54,6 +54,18 @@ FORBIDDEN_OPERATIONS = {
     "open_terminal",
     "control_vscode",
 }
+PURE_RULE_FORBIDDEN_IMPORTS = {
+    "datetime",
+    "os",
+    "pathlib",
+    "random",
+    "secrets",
+    "socket",
+    "subprocess",
+    "time",
+    "uuid",
+}
+TASK_KEYWORDS = {"camera", "wifi", "udp", "pwm", "timer"}
 
 
 def _python_files(path: Path) -> tuple[Path, ...]:
@@ -113,3 +125,26 @@ def test_future_agents_receive_only_reasoning_analysis() -> None:
         assert tuple(hints) == ("self", "reasoning")
     for forbidden in FORBIDDEN_OPERATIONS:
         assert not hasattr(ReasoningPort, forbidden)
+
+
+def test_rules_are_pure_and_cannot_read_task_intent_keywords() -> None:
+    rules = RUNTIME / "rules"
+    for path in _python_files(rules):
+        tree = _tree(path)
+        for module in _imports(tree):
+            assert module.split(".", 1)[0] not in PURE_RULE_FORBIDDEN_IMPORTS, path
+        for node in ast.walk(tree):
+            assert not isinstance(node, (ast.Global, ast.Nonlocal)), path
+            if isinstance(node, ast.AsyncFunctionDef):
+                raise AssertionError(f"rule functions must be synchronous: {path}")
+            if isinstance(node, ast.Name):
+                assert node.id != "task_intent", path
+            if isinstance(node, ast.Attribute):
+                assert node.attr != "task_intent", path
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                tokens = set(node.value.casefold().replace("_", " ").split())
+                assert not tokens & TASK_KEYWORDS, path
+        for node in tree.body:
+            if isinstance(node, (ast.Assign, ast.AnnAssign)):
+                value = node.value
+                assert not isinstance(value, (ast.List, ast.Dict, ast.Set)), path

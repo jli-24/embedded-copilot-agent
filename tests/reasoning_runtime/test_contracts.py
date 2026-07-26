@@ -133,5 +133,14 @@ def test_foundation_runtime_returns_review_required_canonical_response() -> None
     assert response.output_type == "reasoning_suggestion"
     assert response.reasoning_summary.presentation_summary is None
     assert response.reasoning_summary.confidence == "low"
+    assert tuple(item.rule_version for item in response.trace.rules_applied) == (
+        "1.0",
+        "1.0",
+        "1.0",
+        "1.0",
+        "1.0",
+        "1.0",
+    )
+    assert tuple(item.category for item in response.risks) == ("context_completeness",)
     assert response.trace.trace_id == "trace:1"
     assert response.review_required is True
