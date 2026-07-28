@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.35.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.36.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -21,6 +21,12 @@ v0.35.0 新增 observation-only Embedded Debug Runtime，提供 caller-owned UAR
 ST-Link 与 GDB source contract、规范化 Debug Snapshot、telemetry 和无内容 audit；不包含
 真实设备 transport、Flash、reset、寄存器/内存写入、自动调试、Agent、API 或 UI。
 Workspace Runtime 仍是唯一文件写入口。
+
+v0.36.0 新增 deterministic、observation-only Telemetry Intelligence Layer，提供
+caller-owned `DEBUG_RUNTIME`/`MOCK` source contract、带 SHA-256 指纹的 sample 与
+bounded series，以及确定性统计、endpoint trend 和 `unverified` anomaly candidate；
+不包含 PID optimization、automatic tuning、hardware control、Flash、真实 transport、
+后台采集、缓存、持久化或硬件验证。
 
 当前可分析的领域包括：
 

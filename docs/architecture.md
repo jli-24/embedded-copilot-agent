@@ -1,5 +1,30 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.36 Telemetry Intelligence Layer
+
+```text
+caller-owned TelemetrySourcePort tuple
+  -> TelemetryRuntime
+  -> TelemetrySample / bounded TelemetrySeriesSnapshot
+  -> deterministic statistics / endpoint trend / anomaly candidate
+  -> content-free TelemetryAuditEvent
+```
+
+`embedded_copilot.telemetry_runtime` 是独立、deterministic、observation-only 的数值
+telemetry 基础层。Runtime 只通过 `TelemetryPort` 暴露同步 sample、series 和 analysis
+操作；精确按 `DEBUG_RUNTIME` 或 `MOCK` source type 路由且不 fallback。source 的连接、
+生命周期和数据采集方式完全由 caller 管理。
+
+单点与序列都使用 canonical JSON 和 SHA-256 指纹并在构造时复核。序列只在当前请求内进行
+2 到 256 次 bounded synchronous pull，不 sleep、不轮询、不缓存或跨请求积累。分析只计算
+minimum、maximum、average、endpoint delta 与 endpoint direction trend；阈值越界只生成
+`unverified` candidate，不产生 root cause、confirmed fault、control action 或自动修复。
+
+`DebugTelemetryContext` 只从 Debug Runtime 公共 `FrozenDebugSnapshot` 投影 telemetry
+metrics，不持有 `DebugPort`，也不传播 identity、UART、register 或 stack 内容。该 Runtime
+不实现 Agent、LLM、RAG、PID、自动调参、硬件控制、Flash、reset、真实 transport、API、
+UI、网络、文件系统、后台任务、缓存或持久化。
+
 ## v0.35 Embedded Debug Runtime
 
 ```text
