@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.32.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.33.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -9,6 +9,9 @@ Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit
 系统接收工程需求与 metadata-only 附件描述，由 Supervisor 规划已有领域 Agent，最终返回
 唯一的跨 API 分析结果 `EngineeringReport`。v0.20.0 新增独立 Evaluation Layer、四视图
 Demo、release documentation 和 CI quality gate；不改变已有 Agent workflow 或 API contract。
+
+v0.33.0 新增独立 Workspace Operation Layer，提供可信根快照、严格 diff 验证、外部人工
+审批后的受控修改和无内容审计；不接入 Agent、API、UI、Shell、Git、构建或 IDE 控制。
 
 当前可分析的领域包括：
 
@@ -52,6 +55,7 @@ LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此�
 - Traceable `EngineeringReport` with `source_agent` and `source_id`
 - Offline Evaluation metrics and deterministic renderers
 - Coding Runtime provides read-only code understanding, static analysis, and build-log analysis.
+- Workspace Runtime provides approval-gated existing-text-file modification under a trusted root.
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo
@@ -161,3 +165,5 @@ git diff --check
 - Evaluation total latency 是本地进程观测值，不是实时性保证；逐 Agent latency 为
   `unavailable`。
 - Coding Runtime 不执行构建或 Git、不控制 IDE 或硬件；其硬件/软件输出为未验证候选，需工程师审核。
+- Workspace Runtime 不生成 patch，不执行命令、构建或 Git，也不控制 IDE；所有变更必须绑定
+  已验证 snapshot、proposal 和外部人工审批。

@@ -98,15 +98,13 @@ def test_chat_paths_return_stable_envelope(path: str) -> None:
 
 
 @pytest.mark.parametrize("path", ["/api/v1/health", "/health"])
-def test_health_paths_report_v032(path: str) -> None:
-    response = asyncio.run(
-        _request(FakeCopilotService(), "GET", path)
-    )
+def test_health_paths_report_v033(path: str) -> None:
+    response = asyncio.run(_request(FakeCopilotService(), "GET", path))
 
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.32.0",
+        "version": "0.33.0",
         "mode": "offline",
     }
 
@@ -114,9 +112,7 @@ def test_health_paths_report_v032(path: str) -> None:
 def test_blank_message_uses_validation_error_envelope() -> None:
     service = FakeCopilotService()
 
-    response = asyncio.run(
-        _request(service, "POST", "/chat", json={"message": "   "})
-    )
+    response = asyncio.run(_request(service, "POST", "/chat", json={"message": "   "}))
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"

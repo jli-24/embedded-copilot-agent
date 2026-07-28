@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import inspect
 from pathlib import Path
-from typing import get_type_hints
+from typing import get_args, get_origin
 
 from embedded_copilot.file_runtime import (
     DocumentSummary,
@@ -11,7 +11,7 @@ from embedded_copilot.file_runtime import (
     FileReferenceCatalog,
     FileReferenceRequest,
 )
-from embedded_copilot.file_runtime.contracts import Extractor
+from embedded_copilot.file_runtime.contracts import Extractor, ReadOnlyExtractor
 
 ROOT = Path(__file__).parents[2]
 SRC = ROOT / "src" / "embedded_copilot"
@@ -154,7 +154,13 @@ def test_file_contracts_are_read_only_and_content_free() -> None:
         for name, value in FileReferenceCatalog.__dict__.items()
         if callable(value) and not name.startswith("_")
     } == {"resolve"}
-    assert get_type_hints(Extractor.extract)["return"] is DocumentSummary
+    legacy_extractor_bases = tuple(
+        base
+        for base in Extractor.__orig_bases__
+        if get_origin(base) is ReadOnlyExtractor
+    )
+    assert len(legacy_extractor_bases) == 1
+    assert get_args(legacy_extractor_bases[0]) == (DocumentSummary,)
     assert tuple(FileReferenceRequest.model_fields) == (
         "session_id",
         "file_id",

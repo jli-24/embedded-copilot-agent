@@ -1,5 +1,39 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.33 Workspace Operation Layer
+
+```text
+trusted workspace root + explicit relative paths
+  -> frozen Workspace Snapshot
+  -> ChangeProposal unified diff
+  -> current-content validation
+  -> external human approval
+  -> private FileWritePort
+  -> content-free audit event
+```
+
+`embedded_copilot.workspace_runtime` is an independent, approval-gated mutation
+capability. It is not an Agent, workflow, IDE integration, Shell, Git, or build
+runner. The factory owns one trusted root; requests cannot scan directories or
+address files outside that root. Snapshots contain only normalized paths, hashes,
+sizes, and language classifications.
+
+Only an existing UTF-8 text file represented by a verified snapshot may receive a
+strict unified diff. Validation binds the target file and its parent directory
+chain to descriptor-derived identities, verifies the snapshot hash, and
+precomputes every output before approval. A process-local canonical proposal
+fingerprint prevents an approval from being reused with altered diff, reason, or
+creator fields. `apply_change()` repeats validation, checks the externally
+supplied approval binding, and then uses same-directory temporary files plus
+recovery backups for controlled replacement and reverse rollback. Audit output
+contains identifiers, relative paths, approval identity, and supplied UTC time,
+never file content, hashes, diff text, tokens, or secrets.
+
+The cross-platform implementation binds descriptor-derived identities and hashes
+but does not add platform-specific native-handle traversal. `APPLIED` is a
+process-level result, not a crash-durability guarantee, and callers serialize
+operations for each runtime instance.
+
 ## v0.32 Coding Intelligence Layer
 
 ```text

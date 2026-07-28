@@ -25,7 +25,6 @@ from embedded_copilot.pcb.models import PCBReviewReport
 from embedded_copilot.schemas.api import HealthResponse
 from embedded_copilot.schemas.result import ContractModel
 
-
 PUBLIC_SCHEMA_HASHES: tuple[tuple[type[ContractModel], str], ...] = (
     (
         AgentTask,
@@ -117,5 +116,5 @@ def test_health_schema_preserves_fields_and_required_state() -> None:
     assert set(schema["properties"]) == {"status", "version", "mode"}
     assert schema["properties"]["status"]["enum"] == ["ok", "degraded"]
     assert schema["properties"]["mode"]["enum"] == ["offline", "llm"]
-    assert schema["properties"]["version"]["const"] == "0.32.0"
-    assert schema["properties"]["version"]["default"] == "0.32.0"
+    assert schema["properties"]["version"]["const"] == "0.33.0"
+    assert schema["properties"]["version"]["default"] == "0.33.0"
