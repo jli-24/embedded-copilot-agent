@@ -1,5 +1,31 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.34 VS Code MCP Integration Layer
+
+```text
+VS Code tool request
+  -> transport-neutral MCP adapter contract
+  -> VSCodePort
+  -> CodingIntelligencePort / WorkspacePort
+```
+
+`embedded_copilot.vscode_runtime` performs only deterministic argument
+validation, DTO conversion, capability gating, and invocation of existing public
+Runtime ports. Callers provide source text, compiler logs, diffs, proposal IDs,
+and approval timestamps explicitly; the integration layer does not read files,
+scan directories, execute commands, persist content, or generate authority.
+
+The default adapter exposes five non-mutating tools. Applying a change requires
+construction-time opt-in and a caller-provided `ApprovalContext`, while Workspace
+Runtime remains the only write boundary and revalidates the complete proposal,
+snapshot, target, and approval binding. `create_change_proposal` always calls
+`WorkspacePort.validate_change()` so an unvalidated proposal cannot enter the
+approval flow.
+
+v0.34 is an MCP adapter contract foundation. It has no MCP SDK dependency and
+does not start an MCP server or implement stdio, HTTP, WebSocket, network, IDE,
+Shell, Git, build, flash, or hardware-control transport.
+
 ## v0.33 Workspace Operation Layer
 
 ```text
