@@ -4,10 +4,6 @@ from pathlib import Path
 
 import tomllib
 
-from embedded_copilot import __version__
-from embedded_copilot.core.config import Settings
-from embedded_copilot.schemas.api import HealthResponse
-
 
 def test_v036_release_documents_deterministic_telemetry_boundary() -> None:
     release = Path("docs/release/v0.36.0.md").read_text(encoding="utf-8")
@@ -28,17 +24,6 @@ def test_v036_release_documents_deterministic_telemetry_boundary() -> None:
         "hardware validation",
     ):
         assert non_goal in release
-
-
-def test_v036_versions_are_synchronized() -> None:
-    project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
-
-    assert project["version"] == "0.36.0"
-    assert __version__ == "0.36.0"
-    assert Settings().version == "0.36.0"
-    assert HealthResponse(status="ok", mode="offline").version == "0.36.0"
 
 
 def test_v036_does_not_add_analysis_or_hardware_dependencies() -> None:

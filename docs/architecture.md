@@ -1,5 +1,31 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.37 Tool Execution Layer
+
+```text
+ToolExecutionContext
+  -> required TOOL_REQUESTED audit
+  -> caller-owned ToolPermissionPort
+  -> immutable adapter registry
+  -> EngineeringToolPort
+  -> normalized ToolResult
+  -> required terminal audit
+```
+
+`embedded_copilot.tool_runtime` 是独立、framework-independent 的受控能力执行基础层。
+公共 facade 只暴露同步 `ToolExecutionPort`；可信 composition 通过不可变 tuple
+注入 `EngineeringToolPort`、权限端口和 audit sink。授权结果与 request、tool、
+caller 以及完整参数 fingerprint 精确绑定，不存在 fallback 或全局权限状态。
+
+`adapters/` 只负责把既有公共 Runtime Port 或显式 Mock scenario 适配为受控能力。
+`compile_firmware` 与 `run_firmware_test` 在 v0.37 中只提供强制标记为 `MOCK`
+的确定性场景；`read_serial_log` 只调用一次公共 `DebugPort` UART snapshot，并丢弃
+target identity、register、stack 与其他非串口内容。
+
+Runtime 不接入 Agent、Supervisor、API 或 UI，不读取或修改文件，不执行 Shell、
+Git、真实 build/test、Flash、reset 或硬件控制。Workspace Runtime 继续作为唯一
+文件写入口。
+
 ## v0.36 Telemetry Intelligence Layer
 
 ```text
