@@ -1,5 +1,33 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.35 Embedded Debug Runtime
+
+```text
+caller-owned DebugSourcePort tuple
+  -> DebugRuntime
+  -> source-specific read-only adapter
+  -> normalized TargetIdentity / Debug Snapshot / Telemetry
+  -> content-free DebugAuditEvent
+```
+
+`embedded_copilot.debug_runtime` is a framework-independent, observation-only
+hardware debug foundation. Its factory accepts a non-empty immutable tuple of
+caller-owned UART, J-Link, ST-Link, or GDB source ports. Routing is exact by
+source type, never falls back, and does not own connections, device handles,
+processes, transports, credentials, or provider lifecycle.
+
+Each operation performs one synchronous, request-scoped observation and emits a
+corresponding content-free audit event using the caller-provided UTC timestamp.
+Snapshots contain only bounded normalized UART records, register summaries,
+stack-frame summaries, and finite telemetry metrics. They do not contain source
+code, paths, locals, arguments, memory buffers, firmware images, credentials, or
+device secrets.
+
+The Runtime does not implement a hardware transport, Agent, model invocation,
+automatic debugging, API, UI, network, filesystem access, Shell, Git, build,
+flash, reset, register or memory mutation. Workspace Runtime remains the only
+file write boundary.
+
 ## v0.34 VS Code MCP Integration Layer
 
 ```text

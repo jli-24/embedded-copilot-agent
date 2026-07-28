@@ -228,7 +228,7 @@ Pin No. Pin Name Function
             serialized = report.model_dump_json()
             assert "camera_config_t" not in serialized
             assert str(tmp_path) not in serialized
-            assert __version__ == "0.34.0"
+            assert __version__ == "0.35.0"
         finally:
             await service.close()
 
