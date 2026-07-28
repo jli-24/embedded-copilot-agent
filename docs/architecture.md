@@ -1,5 +1,28 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.32 Coding Intelligence Layer
+
+```text
+caller-provided bounded code DTOs
+  -> CodingIntelligencePort
+  -> frozen, fingerprinted Code Context Snapshot
+  -> deterministic Project / Build / Diff / Dependency analyzers
+  -> unverified hardware/software candidates
+```
+
+`embedded_copilot.coding_runtime` is an independent read-only capability, not an
+Agent or workflow. `CodingRuntime` exposes only `coding_port()`; callers provide
+bounded source text, compiler diagnostics, unified diffs, and hardware candidates
+through frozen DTOs. The generated snapshot contains normalized relative paths,
+content hashes, line counts, symbols, dependencies, and explicit hardware-access
+candidates, never source text.
+
+The runtime does not read a workspace, run Git or a compiler, modify code, call a
+model, control an IDE, or access a device. C/C++ parsing is Tree-sitter based and
+Python parsing uses `ast`; project marker analysis is deterministic. Any
+hardware/software relationship is a datasheet-bound, unverified candidate that
+requires engineer review rather than an engineering fact or confirmed conflict.
+
 ## v0.19 Productization Flow
 
 ```text

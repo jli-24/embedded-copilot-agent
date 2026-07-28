@@ -16,13 +16,13 @@ def _headings(path: str) -> tuple[str, ...]:
     )
 
 
-def test_project_versions_are_synchronized_to_v023_alpha1() -> None:
+def test_project_versions_are_synchronized_to_v032() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.23.0-alpha1"
-    assert __version__ == "0.23.0-alpha1"
-    assert Settings().version == "0.23.0-alpha1"
-    assert HealthResponse(status="ok", mode="offline").version == "0.23.0-alpha1"
+    assert pyproject["project"]["version"] == "0.32.0"
+    assert __version__ == "0.32.0"
+    assert Settings().version == "0.32.0"
+    assert HealthResponse(status="ok", mode="offline").version == "0.32.0"
 
 
 def test_readme_has_release_structure_and_required_limitations() -> None:

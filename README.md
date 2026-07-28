@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.20.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.32.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -51,6 +51,7 @@ LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此�
 - Firmware、Hardware、PCB、Debug domain Agents
 - Traceable `EngineeringReport` with `source_agent` and `source_id`
 - Offline Evaluation metrics and deterministic renderers
+- Coding Runtime provides read-only code understanding, static analysis, and build-log analysis.
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo
@@ -159,3 +160,4 @@ git diff --check
 - PCB/Datasheet parsing 只支持已验证的有限格式和 evidence 范围。
 - Evaluation total latency 是本地进程观测值，不是实时性保证；逐 Agent latency 为
   `unavailable`。
+- Coding Runtime 不执行构建或 Git、不控制 IDE 或硬件；其硬件/软件输出为未验证候选，需工程师审核。

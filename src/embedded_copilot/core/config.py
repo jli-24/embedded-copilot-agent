@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Embedded Copilot Agent"
-    version: Literal["0.23.0-alpha1"] = "0.23.0-alpha1"
+    version: Literal["0.32.0"] = "0.32.0"
     environment: str = "development"
     debug: bool = False
     llm_provider: str | None = None

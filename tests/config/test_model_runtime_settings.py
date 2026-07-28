@@ -21,7 +21,7 @@ def test_model_provider_defaults_to_explicit_unavailable() -> None:
         timeout_seconds=10.0,
         require_tls=False,
     )
-    assert settings.version == "0.23.0-alpha1"
+    assert settings.version == "0.32.0"
 
 
 def test_ollama_is_opt_in_and_requires_configured_model() -> None:
