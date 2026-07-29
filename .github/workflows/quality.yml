@@ -21,9 +21,9 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install --no-deps -e ".[dev]"
       - name: Verify public schemas
-        run: pytest tests/release/test_contract_compatibility.py -q
+        run: python -m pytest tests/release/test_contract_compatibility.py -q
       - name: Run test suite
-        run: pytest -q
+        run: python -m pytest -q
       - name: Compile Python sources
         run: python -m compileall -q src tests
       - name: Run Ruff
