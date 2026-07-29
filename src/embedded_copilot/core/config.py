@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "Embedded Copilot Agent"
-    version: Literal["0.38.0"] = "0.38.0"
+    version: Literal["0.39.0"] = "0.39.0"
     environment: str = "development"
     debug: bool = False
     llm_provider: str | None = None
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def validate_chunk_window(self) -> "Settings":
+    def validate_chunk_window(self) -> Settings:
         if self.chunk_overlap >= self.chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size")
         return self

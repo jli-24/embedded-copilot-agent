@@ -10,14 +10,14 @@ from embedded_copilot.engineering import config as engineering_config
 from embedded_copilot.engineering.adapter import EngineeringSupervisorAdapter
 from embedded_copilot.engineering.agent_adapters import HardwareAgentInputAdapter
 from embedded_copilot.engineering.config import EngineeringExtensionSettings
+from embedded_copilot.hardware.agent import HardwareAgent
+from embedded_copilot.hardware_design.adapter import (
+    HardwareBlueprintProjectionAgentAdapter,
+)
 from embedded_copilot.input.models import (
     AttachmentType,
     UnifiedInputContext,
     UserAttachment,
-)
-from embedded_copilot.hardware.agent import HardwareAgent
-from embedded_copilot.hardware_design.adapter import (
-    HardwareBlueprintProjectionAgentAdapter,
 )
 from embedded_copilot.services.analysis import AnalysisCommand
 from embedded_copilot.services.config import Settings
@@ -228,7 +228,7 @@ Pin No. Pin Name Function
             serialized = report.model_dump_json()
             assert "camera_config_t" not in serialized
             assert str(tmp_path) not in serialized
-            assert __version__ == "0.38.0"
+            assert __version__ == "0.39.0"
         finally:
             await service.close()
 

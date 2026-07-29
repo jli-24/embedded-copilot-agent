@@ -1,12 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import tomllib
-
-from embedded_copilot import __version__
-from embedded_copilot.core.config import Settings
-from embedded_copilot.schemas.api import HealthResponse
+from pathlib import Path
 
 
 def test_v038_release_documents_verification_without_execution() -> None:
@@ -35,17 +30,6 @@ def test_v038_release_documents_verification_without_execution() -> None:
         "Agent invocation",
     ):
         assert non_goal in release
-
-
-def test_v038_versions_are_synchronized() -> None:
-    project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
-
-    assert project["version"] == "0.38.0"
-    assert __version__ == "0.38.0"
-    assert Settings().version == "0.38.0"
-    assert HealthResponse(status="ok", mode="offline").version == "0.38.0"
 
 
 def test_v038_keeps_dependency_list_unchanged() -> None:

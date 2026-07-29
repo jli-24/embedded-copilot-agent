@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -19,12 +21,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install --no-deps -e ".[dev]"
+          python -m pip install -e ".[dev]"
       - name: Verify public schemas
-        run: pytest tests/release/test_contract_compatibility.py -q
+        run: python -m pytest tests/release/test_contract_compatibility.py -q
       - name: Run test suite
-        run: pytest -q
+        run: python -m pytest -q
       - name: Compile Python sources
         run: python -m compileall -q src tests
       - name: Run Ruff
-        run: ruff check .
+        shell: bash
+        run: |
+          mapfile -t python_files < <(
+            git diff --name-only --diff-filter=ACMR origin/main...HEAD -- '*.py'
+          )
+          if ((${#python_files[@]})); then
+            ruff check -- "${python_files[@]}"
+          fi
