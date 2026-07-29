@@ -1,5 +1,30 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.38 Verification Agent Layer
+
+```text
+Engineering Result
+  -> strict VerificationRequest
+  -> injected deterministic Checker tuple
+  -> atomic checker batch
+  -> VerificationResult
+  -> Verified Decision candidate
+```
+
+`embedded_copilot.verification_agent` 是独立、framework-independent 的确定性验证基础层。
+公共 facade 只暴露同步 `VerificationPort`；可信 composition 注入 Checker tuple 与无内容
+audit sink。Firmware、Hardware 与 Tool Result subject 只复用既有 Runtime 公开 DTO，Checker
+不持有 Runtime Port，也不调用 Agent、Model、Tool、Shell、文件系统、网络或硬件。
+
+多 Checker 构成原子验证批次：任一 Checker 缺失、异常或返回畸形结果时立即停止，不执行
+后续 Checker，不返回部分 `VerificationResult`，并记录 `VERIFICATION_FAILED`。正常结果按
+`FAIL > REVIEW_REQUIRED > PASS` 聚合，Finding 始终为 `candidate_semantics="unverified"`。
+`FAIL` 表示当前提案未通过验证规则，不表示已确认真实设备故障；候选输入是否同时启用仍需
+工程师确认。
+
+该层不执行 Tool、不修改文件、不自动修复、不调用 Agent 或 LLM、不控制硬件。Workspace
+Runtime 继续作为唯一文件写入口。
+
 ## v0.37 Tool Execution Layer
 
 ```text

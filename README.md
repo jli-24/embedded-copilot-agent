@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.37.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.38.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -32,6 +32,11 @@ v0.37.0 新增 security-first Tool Execution Layer，提供 request fingerprint 
 不可变 capability adapter registry、结果规范化和同步双阶段审计；build/test 仅支持显式
 Mock scenario，串口日志只投影一次 Debug Runtime UART snapshot，不包含 Agent 接入、Shell、
 真实构建/测试、Flash、硬件控制或文件写入。Workspace Runtime 仍是唯一文件写入口。
+
+v0.38.0 新增 Verification Agent Layer，对 Firmware、Hardware 与 Tool Result 执行确定性
+候选验证。`FAIL` 仅表示当前提案未通过验证规则，不表示已确认真实硬件故障；任一 Checker
+异常会使整批验证失败，不返回部分结果。该层不执行工具、不自动修复，也不改变 Workspace
+Runtime 的唯一写边界。
 
 当前可分析的领域包括：
 
