@@ -18,7 +18,7 @@ def _race(*operations):
         barrier.wait()
         try:
             return operation()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             return error
 
     with ThreadPoolExecutor(max_workers=len(operations)) as executor:
@@ -70,8 +70,8 @@ def test_concurrent_replacement_activation_has_one_atomic_winner() -> None:
         MemoryStatus,
     )
 
-    from .test_state_transitions import NOW, _create as create_decision
-    from .test_state_transitions import _history, _provenance
+    from .test_state_transitions import NOW, _history, _provenance
+    from .test_state_transitions import _create as create_decision
 
     store = InMemoryEngineeringMemoryStore()
     store.create_candidate(create_decision(), request_fingerprint="sha256:" + "a" * 64)

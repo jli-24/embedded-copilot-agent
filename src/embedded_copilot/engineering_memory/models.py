@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Annotated, Literal, TypeAlias
 
@@ -125,7 +125,7 @@ class MemorySnapshotType(StrEnum):
 
 def _identifier(value: object, *, field: str) -> str:
     if not isinstance(value, str):
-        raise ValueError(f"{field} is invalid")
+        raise ValueError(f"{field} is invalid")  # noqa: TRY004
     candidate = unicodedata.normalize("NFC", value.strip())
     if not _IDENTIFIER.fullmatch(candidate):
         raise ValueError(f"{field} is invalid")
@@ -134,7 +134,7 @@ def _identifier(value: object, *, field: str) -> str:
 
 def _safe_text(value: object, *, field: str, max_length: int = 512) -> str:
     if not isinstance(value, str):
-        raise ValueError(f"{field} is invalid")
+        raise ValueError(f"{field} is invalid")  # noqa: TRY004
     candidate = unicodedata.normalize("NFC", value.strip())
     if (
         not candidate
@@ -164,7 +164,7 @@ def _safe_derived_reference(value: object, *, field: str) -> str:
 def _utc(value: datetime) -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("timestamp must be timezone aware")
-    return value.astimezone(timezone.utc)
+    return value.astimezone(UTC)
 
 
 def _fingerprint(value: object, *, field: str) -> str:
@@ -297,7 +297,7 @@ class PowerConstraintMemory(_EngineeringMemoryContract):
         return _identifier(value, field=info.field_name)
 
     @model_validator(mode="after")
-    def validate_voltage_range(self) -> "PowerConstraintMemory":
+    def validate_voltage_range(self) -> PowerConstraintMemory:
         if self.minimum_voltage_mv > self.maximum_voltage_mv:
             raise ValueError("power voltage range is invalid")
         return self
@@ -517,7 +517,7 @@ class EngineeringMemoryRecord(_EngineeringMemoryContract):
         return _utc(value)
 
     @model_validator(mode="after")
-    def validate_record_consistency(self) -> "EngineeringMemoryRecord":
+    def validate_record_consistency(self) -> EngineeringMemoryRecord:
         if self.payload.memory_type is not self.memory_type:
             raise ValueError("record memory type is invalid")
         if self.created_aggregate_revision > self.last_updated_aggregate_revision:
@@ -551,7 +551,9 @@ _PAYLOAD_TYPES = (
 
 def _typed_payload(value: object) -> object:
     if not isinstance(value, _PAYLOAD_TYPES):
-        raise ValueError("payload must be a typed memory contract")
+        raise ValueError(  # noqa: TRY004
+            "payload must be a typed memory contract"
+        )
     return value
 
 
@@ -577,7 +579,9 @@ class CreateCandidateRequest(_MemoryWriteRequestContract):
     @classmethod
     def validate_provenance(cls, value: object) -> object:
         if not isinstance(value, MemoryProvenance):
-            raise ValueError("provenance must be a typed memory contract")
+            raise ValueError(  # noqa: TRY004
+                "provenance must be a typed memory contract"
+            )
         return value
 
 
@@ -608,7 +612,7 @@ class ApplyVerificationRequest(_MemoryWriteRequestContract):
         return _identifier(value, field="record_id")
 
     @model_validator(mode="after")
-    def validate_verification_ids(self) -> "ApplyVerificationRequest":
+    def validate_verification_ids(self) -> ApplyVerificationRequest:
         if self.verification_request.request_id != self.verification_result.request_id:
             raise ValueError("verification request and result do not match")
         return self
@@ -628,7 +632,7 @@ class ApplyHumanApprovalRequest(_MemoryWriteRequestContract):
         return _identifier(value, field="record_id")
 
     @model_validator(mode="after")
-    def validate_approval_binding(self) -> "ApplyHumanApprovalRequest":
+    def validate_approval_binding(self) -> ApplyHumanApprovalRequest:
         if (
             self.approval.record_id != self.record_id
             or self.approval.record_revision != self.record_revision
@@ -730,7 +734,7 @@ class MemoryPermissionDecision(MemoryAuthorizationRequest):
     reason_code: Literal["AUTHORIZED", "POLICY_DENIED"]
 
     @model_validator(mode="after")
-    def validate_decision_reason(self) -> "MemoryPermissionDecision":
+    def validate_decision_reason(self) -> MemoryPermissionDecision:
         if (
             self.decision is MemoryPermissionStatus.ALLOWED
             and self.reason_code != "AUTHORIZED"
@@ -801,7 +805,7 @@ class MemoryMutationResult(_EngineeringMemoryContract):
         return _identifier(value, field=info.field_name)
 
     @model_validator(mode="after")
-    def validate_affected_records(self) -> "MemoryMutationResult":
+    def validate_affected_records(self) -> MemoryMutationResult:
         ids = tuple(item.record_id for item in self.affected_records)
         if len(ids) != len(set(ids)):
             raise ValueError("affected records must be unique")
@@ -880,7 +884,7 @@ class EngineeringMemoryHistoryPage(_EngineeringMemoryContract):
         return GetHistoryRequest.validate_cursor(value)
 
     @model_validator(mode="after")
-    def validate_pagination(self) -> "EngineeringMemoryHistoryPage":
+    def validate_pagination(self) -> EngineeringMemoryHistoryPage:
         if self.has_more != (self.next_cursor is not None):
             raise ValueError("history pagination is invalid")
         return self

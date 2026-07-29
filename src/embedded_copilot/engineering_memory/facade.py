@@ -10,7 +10,7 @@ class EngineeringMemory:
         raise TypeError("EngineeringMemory must be created by its factory")
 
     @classmethod
-    def _compose(cls, port: EngineeringMemoryPort) -> "EngineeringMemory":
+    def _compose(cls, port: EngineeringMemoryPort) -> EngineeringMemory:
         instance = object.__new__(cls)
         instance._port = port
         return instance

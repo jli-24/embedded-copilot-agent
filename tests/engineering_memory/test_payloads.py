@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -26,7 +26,7 @@ from embedded_copilot.verification_agent import (
     VerificationSubjectType,
 )
 
-UTC_TIME = datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc)
+UTC_TIME = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
 
 
 def _payloads() -> tuple[object, ...]:

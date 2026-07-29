@@ -10,14 +10,14 @@ from embedded_copilot.engineering import config as engineering_config
 from embedded_copilot.engineering.adapter import EngineeringSupervisorAdapter
 from embedded_copilot.engineering.agent_adapters import HardwareAgentInputAdapter
 from embedded_copilot.engineering.config import EngineeringExtensionSettings
+from embedded_copilot.hardware.agent import HardwareAgent
+from embedded_copilot.hardware_design.adapter import (
+    HardwareBlueprintProjectionAgentAdapter,
+)
 from embedded_copilot.input.models import (
     AttachmentType,
     UnifiedInputContext,
     UserAttachment,
-)
-from embedded_copilot.hardware.agent import HardwareAgent
-from embedded_copilot.hardware_design.adapter import (
-    HardwareBlueprintProjectionAgentAdapter,
 )
 from embedded_copilot.services.analysis import AnalysisCommand
 from embedded_copilot.services.config import Settings

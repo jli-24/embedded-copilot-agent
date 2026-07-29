@@ -1,6 +1,5 @@
-from pathlib import Path
-
 import tomllib
+from pathlib import Path
 
 from embedded_copilot import __version__
 from embedded_copilot.core.config import Settings

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -36,7 +36,7 @@ from embedded_copilot.verification_agent import (
     VerificationSubjectType,
 )
 
-NOW = datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
 
 
 def _provenance() -> MemoryProvenance:
@@ -58,18 +58,18 @@ def _decision(topic: str = "rtos-choice") -> EngineeringDecisionMemory:
 
 
 def _create(payload=None, **changes) -> CreateCandidateRequest:
-    values = dict(
-        request_id="create-1",
-        operation_id="create-op-1",
-        project_id="project-1",
-        memory_id="memory-1",
-        caller="caller-1",
-        requested_at=NOW,
-        expected_revision=0,
-        record_id="record-1",
-        payload=payload or _decision(),
-        provenance=_provenance(),
-    )
+    values = {
+        "request_id": "create-1",
+        "operation_id": "create-op-1",
+        "project_id": "project-1",
+        "memory_id": "memory-1",
+        "caller": "caller-1",
+        "requested_at": NOW,
+        "expected_revision": 0,
+        "record_id": "record-1",
+        "payload": payload or _decision(),
+        "provenance": _provenance(),
+    }
     values.update(changes)
     return CreateCandidateRequest(**values)
 

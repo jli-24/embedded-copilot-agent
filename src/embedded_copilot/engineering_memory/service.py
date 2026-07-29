@@ -16,17 +16,17 @@ from .exceptions import (
 )
 from .fingerprint import canonical_fingerprint
 from .models import (
+    EngineeringMemoryHistoryPage,
     EngineeringMemoryRequest,
     EngineeringMemoryResult,
-    EngineeringMemoryHistoryPage,
     EngineeringMemorySnapshot,
     MemoryAction,
     MemoryAuditEventType,
     MemoryAuthorizationRequest,
     MemoryCommandType,
+    MemoryMutationResult,
     MemoryPermissionDecision,
     MemoryPermissionStatus,
-    MemoryMutationResult,
     MemorySnapshotType,
 )
 from .ports import EngineeringMemoryStorePort, MemoryAuditSink, MemoryPermissionPort
@@ -69,7 +69,7 @@ def _authorized(permission_port, authorization: MemoryAuthorizationRequest) -> N
     try:
         raw = permission_port.authorize(authorization)
         if not isinstance(raw, MemoryPermissionDecision):
-            raise ValueError("permission decision type is invalid")
+            raise ValueError("permission decision type is invalid")  # noqa: TRY004
         decision = MemoryPermissionDecision.model_validate(copy.deepcopy(raw))
         for field in MemoryAuthorizationRequest.model_fields:
             if getattr(decision, field) != getattr(authorization, field):
@@ -115,7 +115,7 @@ def _validate_result_binding(request, result) -> None:
             raise ValueError("store history result type is invalid")
         return
     if not isinstance(result, EngineeringMemorySnapshot):
-        raise ValueError("store snapshot result type is invalid")
+        raise ValueError("store snapshot result type is invalid")  # noqa: TRY004
     if isinstance(result, EngineeringMemorySnapshot):
         expected = (
             MemorySnapshotType.VERIFIED

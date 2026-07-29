@@ -17,7 +17,7 @@ def _require_sync_protocol(value: object, protocol: type[object], name: str) -> 
         if (
             not callable(method)
             or inspect.iscoroutinefunction(method)
-            or inspect.iscoroutinefunction(getattr(method, "__call__", None))
+            or inspect.iscoroutinefunction(type(method).__call__)
         ):
             raise TypeError(f"{name} must use synchronous methods")
 

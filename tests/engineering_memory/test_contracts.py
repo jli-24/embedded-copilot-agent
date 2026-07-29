@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
+from embedded_copilot.engineering_memory.fingerprint import canonical_fingerprint
 from embedded_copilot.engineering_memory.models import (
     AffectedMemoryRecord,
     ApplyHumanApprovalRequest,
@@ -13,10 +14,10 @@ from embedded_copilot.engineering_memory.models import (
     CreateCandidateRequest,
     CreateReplacementCandidateRequest,
     EngineeringMemoryHistoryPage,
+    EngineeringMemoryRecord,
     EngineeringMemoryRequest,
     EngineeringMemoryResult,
     EngineeringMemorySnapshot,
-    EngineeringMemoryRecord,
     GetCandidateSnapshotRequest,
     GetHistoryRequest,
     GetVerifiedSnapshotRequest,
@@ -29,9 +30,9 @@ from embedded_copilot.engineering_memory.models import (
     MemoryMutationOutcome,
     MemoryMutationResult,
     MemoryPermissionDecision,
+    MemoryPermissionStatus,
     MemoryProvenance,
     MemorySourceType,
-    MemoryPermissionStatus,
     MemoryStatus,
     MemoryType,
     RevokeRecordRequest,
@@ -39,7 +40,6 @@ from embedded_copilot.engineering_memory.models import (
     _MemoryRequestContract,
     _MemoryWriteRequestContract,
 )
-from embedded_copilot.engineering_memory.fingerprint import canonical_fingerprint
 from embedded_copilot.engineering_memory.rules import (
     build_candidate_record,
     memory_context_id,
@@ -49,7 +49,7 @@ from embedded_copilot.verification_agent import (
     VerificationSubjectType,
 )
 
-UTC_TIME = datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc)
+UTC_TIME = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
 
 
 class _ReadProbe(_MemoryRequestContract):
@@ -91,7 +91,11 @@ def test_contract_is_frozen_strict_and_rejects_extra_fields() -> None:
 
 def test_datetime_must_be_aware_and_is_normalized_to_utc() -> None:
     with pytest.raises(ValidationError, match="timezone aware"):
-        _ReadProbe(**_common(requested_at=datetime(2026, 7, 29, 12, 0)))
+        _ReadProbe(
+            **_common(
+                requested_at=datetime(2026, 7, 29, 12, 0)  # noqa: DTZ001
+            )
+        )
     plus_eight = datetime(2026, 7, 29, 20, 0, tzinfo=timezone(timedelta(hours=8)))
     value = _ReadProbe(**_common(requested_at=plus_eight))
     assert value.requested_at == UTC_TIME

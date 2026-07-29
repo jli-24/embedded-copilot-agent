@@ -106,7 +106,7 @@ def test_engineering_memory_package_is_fixed_and_non_executing() -> None:
                     assert path.name == "models.py", (path, module)
                     assert module == "embedded_copilot.verification_agent"
             if isinstance(node, ast.AsyncFunctionDef):
-                raise AssertionError(path)
+                raise AssertionError(path)  # noqa: TRY004
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 assert node.func.id not in FORBIDDEN_CALLS, path
             if isinstance(node, ast.Attribute):

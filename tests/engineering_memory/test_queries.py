@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -16,7 +16,7 @@ from embedded_copilot.engineering_memory.stores.in_memory import (
     InMemoryEngineeringMemoryStore,
 )
 
-NOW = datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 29, 12, 0, tzinfo=UTC)
 
 
 def _create(number: int, revision: int) -> CreateCandidateRequest:
@@ -47,13 +47,13 @@ def _create(number: int, revision: int) -> CreateCandidateRequest:
 
 
 def _read(cls, **changes):
-    values = dict(
-        request_id="read-1",
-        project_id="project-1",
-        memory_id="memory-1",
-        caller="caller-1",
-        requested_at=NOW,
-    )
+    values = {
+        "request_id": "read-1",
+        "project_id": "project-1",
+        "memory_id": "memory-1",
+        "caller": "caller-1",
+        "requested_at": NOW,
+    }
     values.update(changes)
     return cls(**values)
 
