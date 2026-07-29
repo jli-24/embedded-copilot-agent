@@ -159,11 +159,11 @@ Embedded Copilot 不是简单 ChatBot，也不是单一 Agent，而是由 Runtim
 
 # 2. Current Status
 
-- Current Version：v0.38.0
-- Latest Completed：v0.38.0 Verification Agent Layer
-- Latest Commit：`b9498ea68867a169065a14bc5eb9f300ea1c7269`
-- Current Tag：`v0.38.0`
-- Next Version：v0.39.0 Engineering Memory Layer
+- Current Version：v0.39.0
+- Latest Completed：v0.39.0 Engineering Memory Layer
+- Latest Commit：由 annotated `v0.39.0` tag 与 Git 提供 release commit reference
+- Current Tag：`v0.39.0`
+- Next Version：not yet approved
 
 Previous tags：
 
@@ -180,6 +180,7 @@ Previous tags：
 - v0.36.0 Telemetry Intelligence Layer
 - v0.37.0 Tool Execution Layer
 - v0.38.0 Verification Agent Layer
+- v0.39.0 Engineering Memory Layer
 
 # 3. Architecture Overview
 
@@ -201,6 +202,10 @@ Engineering Result
 Verification Agent
   ↓
 PASS / FAIL / REVIEW_REQUIRED
+  ↓
+Engineering Memory
+  ↓
+CANDIDATE / VERIFIED / History
   ↓
 Debug / Telemetry / Hardware Observation
 ```
@@ -254,6 +259,18 @@ contract，不直接访问其他 Runtime 的内部实现或具体 adapter。
 
 职责：数据分析与趋势检测。
 
+## Tool Runtime
+
+职责：受权限、注册表与无内容审计约束的确定性工具执行合同。
+
+## Verification Agent
+
+职责：对调用方提供的 Firmware、Hardware 与 Tool Result 执行确定性候选验证。
+
+## Engineering Memory
+
+职责：以冻结 Record、Aggregate revision、原子领域命令与最小披露权限管理工程记忆。
+
 # 5. Core Design Principles
 
 - Runtime != Agent
@@ -268,7 +285,7 @@ contract，不直接访问其他 Runtime 的内部实现或具体 adapter。
 
 # 6. Version Roadmap
 
-## v0.37 — Tool Execution Layer
+## v0.37 — Tool Execution Layer（Completed）
 
 目标：受权限和审计约束的工程工具执行基础。
 
@@ -286,7 +303,7 @@ contract，不直接访问其他 Runtime 的内部实现或具体 adapter。
 - Flash
 - Hardware Control
 
-## v0.38 — Verification Agent
+## v0.38 — Verification Agent（Completed）
 
 目标：验证 Agent 生成结果。
 
@@ -296,17 +313,19 @@ contract，不直接访问其他 Runtime 的内部实现或具体 adapter。
 - Hardware Constraint Check
 - Build Verification
 
-## v0.39 — Engineering Memory
+## v0.39 — Engineering Memory（Completed）
 
-目标：项目长期记忆。
+目标：确定性、可验证且可追踪的工程记忆。
 
 包括：
 
-- `board.yaml`
-- `pin_map.json`
-- `components.json`
-- `decisions.md`
-- `bugs.json`
+- strict frozen Record 与 Payload
+- CANDIDATE / VERIFIED 隔离
+- Verification 与受限 Human Approval 状态转换
+- revision、operation receipt 与 revision-bound history
+- 同步线程安全 InMemory reference Store
+
+禁止真实持久化、Agent/LLM/RAG 调用、Tool execution、文件或硬件操作及 hard delete。
 
 ## v0.40 — Component Intelligence
 
@@ -365,21 +384,19 @@ PID Optimization
 
 # 8. Current Development Focus
 
-当前：v0.37 Tool Execution Layer。
+当前：v0.39 Engineering Memory Layer 已完成；下一版本尚未批准。
 
 ```text
-ToolExecutionPort
+EngineeringMemoryPort
   ↓
-ToolRuntime
+strict validation / audit / permission
   ↓
-EngineeringToolPort
+InMemoryEngineeringMemoryStore
   ↓
-Adapter
-  ↓
-External Executor
+CANDIDATE / VERIFIED / revision-bound history
 ```
 
-Mock 只用于测试。生产环境通过 Adapter 注入具体 External Executor。
+v0.39 仅提供进程内 reference Store；不包含数据库或其他真实持久化 adapter。
 
 # 9. Future Expansion
 

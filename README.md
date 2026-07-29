@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.38.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.39.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -37,6 +37,11 @@ v0.38.0 新增 Verification Agent Layer，对 Firmware、Hardware 与 Tool Resul
 候选验证。`FAIL` 仅表示当前提案未通过验证规则，不表示已确认真实硬件故障；任一 Checker
 异常会使整批验证失败，不返回部分结果。该层不执行工具、不自动修复，也不改变 Workspace
 Runtime 的唯一写边界。
+
+v0.39.0 新增 Engineering Memory Layer，以 strict frozen contract、revision、operation
+receipt 和最小披露权限保存工程记忆候选。只有兼容 Verification 或受限 Human Approval
+可以推进可信状态；首版仅提供同步线程安全的 InMemory reference Store，不提供真实持久化、
+Agent/LLM/RAG 调用、Tool execution、文件或硬件操作。Workspace Runtime 仍是唯一写边界。
 
 当前可分析的领域包括：
 
@@ -82,6 +87,7 @@ LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此�
 - Coding Runtime provides read-only code understanding, static analysis, and build-log analysis.
 - Workspace Runtime provides approval-gated existing-text-file modification under a trusted root.
 - VS Code MCP Integration Layer provides transport-neutral adapters to existing Runtime Ports.
+- Engineering Memory separates CANDIDATE records from deterministic VERIFIED projections.
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo

@@ -1,5 +1,22 @@
 # Embedded Copilot Agent v0.19 Architecture
 
+## v0.39 Engineering Memory Layer
+
+Engineering Memory 是独立、framework-independent 的同步领域层。唯一公共业务入口为
+`EngineeringMemoryPort.execute()`；facade 只公开 `memory_port()`。调用方提供的 strict
+frozen command 先经过重新验证和 canonical SHA-256，再依次通过无内容 audit、最小披露
+permission、原子 Store operation 与终态 audit。
+
+首版 `InMemoryEngineeringMemoryStore` 以每实例私有 `RLock` 保护 Aggregate。receipt
+检查、revision 检查、状态转换、双记录替代、projection 更新和 receipt 写入均在同一个锁
+保护的 Store 临界区内完成。History cursor 固定绑定 aggregate revision，Verification
+History identity 为 append-only。
+
+`CANDIDATE` 与 `VERIFIED` 明确隔离。技术事实必须消费调用方提供的 Verification
+request/result；仅 Engineering Decision 与 Known Issue 允许受限 Human Approval。
+Memory 不调用 Verification Agent、Agent、LLM、RAG 或 Tool，不访问 filesystem、network、
+database 或硬件，不提供 hard delete。Workspace Runtime 保持唯一文件写边界。
+
 ## v0.38 Verification Agent Layer
 
 ```text
