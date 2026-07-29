@@ -10,7 +10,10 @@ def test_quality_workflow_runs_all_offline_release_gates() -> None:
     assert "pytest tests/release/test_contract_compatibility.py -q" in workflow
     assert "pytest -q" in workflow
     assert "python -m compileall -q src tests" in workflow
-    assert "ruff check ." in workflow
+    assert "git diff --name-only" in workflow
+    assert "'*.py'" in workflow
+    assert "ruff check" in workflow
+    assert "ruff check ." not in workflow
     assert "services:" not in workflow
     assert "secrets." not in workflow
     assert "docker login" not in workflow
