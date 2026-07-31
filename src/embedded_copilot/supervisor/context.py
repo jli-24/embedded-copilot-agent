@@ -430,3 +430,33 @@ class SupervisorFallbackTraceEvent(_PlanningContextContract):
         if type(value) is not int or value < 0:
             raise ValueError("memory_count is invalid")
         return value
+
+
+SupervisorKnowledgeTraceStage = Literal["retrieval"]
+SupervisorKnowledgeTraceStatus = Literal["success", "failed"]
+SupervisorKnowledgeTraceSource = Literal[
+    "datasheet",
+    "official_doc",
+    "github",
+    "web",
+    "user_upload",
+    "generated",
+    "mixed",
+    "none",
+]
+
+
+class SupervisorKnowledgeTraceEvent(_PlanningContextContract):
+    sequence: int = Field(ge=1)
+    stage: SupervisorKnowledgeTraceStage
+    status: SupervisorKnowledgeTraceStatus
+    count: int = Field(ge=0)
+    source_type: SupervisorKnowledgeTraceSource
+
+    @field_validator("sequence", "count", mode="before")
+    @classmethod
+    def validate_counts(cls, value: object, info) -> int:
+        minimum = 1 if info.field_name == "sequence" else 0
+        if type(value) is not int or value < minimum:
+            raise ValueError(f"{info.field_name} is invalid")
+        return value

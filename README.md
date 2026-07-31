@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.40.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.41.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -43,6 +43,15 @@ receipt 和最小披露权限保存工程记忆候选。只有兼容 Verificatio
 可以推进可信状态；首版仅提供同步线程安全的 InMemory reference Store，不提供真实持久化、
 Agent/LLM/RAG 调用、Tool execution、文件或硬件操作。Workspace Runtime 仍是唯一写边界。
 
+v0.40.0 新增 read-side Memory Intelligence Layer，将 VERIFIED Memory 确定性投影为规划上下文，
+并与 Knowledge Gateway 融合。Memory、Knowledge、Fusion 或 context-aware planning 失败时，
+Supervisor 使用脱敏 trace 安全降级，不绕过既有 Permission、Audit 或 Verification contract。
+
+v0.41.0 新增 read-only Knowledge Intelligence Layer，提供注入式 Web Research/Datasheet Port、
+确定性 Knowledge Verification、带 `KnowledgeProvenance` 的 Verified Evidence、不可变 Knowledge
+Graph Snapshot 和只投影 candidate 的 Memory Bridge。Knowledge Graph 只辅助 Planning，不能生成
+任务、选择 Agent、构造 `SupervisorPlan` 或触发执行。
+
 当前可分析的领域包括：
 
 - Datasheet analysis
@@ -74,6 +83,35 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.41 Architecture
+
+```text
+External Knowledge Source
+  -> Knowledge Candidate Evidence
+  -> Knowledge Verification
+  -> Verified Knowledge Evidence
+  -> Knowledge Graph Projection
+  -> Supervisor Planning Context
+  -> Engineering Memory Bridge
+```
+
+Knowledge 是可选增强来源，不是决策中心。只有 VERIFIED evidence 可以进入 Planning、Graph 或
+Memory Bridge。Graph query 只返回 evidence projection；Memory Bridge 不调用
+`EngineeringMemoryPort.execute()`，永久规则仍由既有 Permission、Audit、Verification 和人工
+审批边界控制。本版本不提供 Neo4j、内置 browser/HTTP transport、自动 PDF 下载、自主搜索循环
+或自动 Memory mutation。
+
+## v0.41 Highlights
+
+- Knowledge Intelligence Runtime
+- Web Research Source Port
+- Datasheet Typed Projection
+- Knowledge Verification
+- Knowledge Provenance
+- Immutable Knowledge Graph Snapshot
+- Memory Bridge Projection
+- Supervisor Verified-only Planning
 
 ## v0.40 Architecture
 
@@ -132,6 +170,7 @@ v0.40 的 Engineering Memory 是 read-side enhancement：仅将已验证记忆�
 - Workspace Runtime provides approval-gated existing-text-file modification under a trusted root.
 - VS Code MCP Integration Layer provides transport-neutral adapters to existing Runtime Ports.
 - Engineering Memory separates CANDIDATE records from deterministic VERIFIED projections.
+- Knowledge Intelligence projects verified evidence, provenance, graph snapshots, and reviewable memory candidates.
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo

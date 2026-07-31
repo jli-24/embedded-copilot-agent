@@ -29,6 +29,12 @@ from embedded_copilot.integration.executor import AgentExecutor
 from embedded_copilot.integration.planner import IntegrationPlanner
 from embedded_copilot.input.adapters.supervisor import _CONTEXT_KEY
 from embedded_copilot.knowledge.gateway import KnowledgeGateway
+from embedded_copilot.knowledge.intelligence import (
+    EngineeringKnowledgeRequest,
+    KnowledgeIntelligencePort,
+    KnowledgeIntelligenceResult,
+    VerifiedKnowledgeEvidence,
+)
 from embedded_copilot.knowledge.models import KnowledgeQuery, KnowledgeResult
 from embedded_copilot.knowledge.source import project_result
 from embedded_copilot.pcb.agent import PCBAgent
@@ -41,6 +47,7 @@ from embedded_copilot.supervisor.context import (
     PlanningKnowledgeContext,
     PlanningKnowledgeEvidence,
     SupervisorFallbackTraceEvent,
+    SupervisorKnowledgeTraceEvent,
     SupervisorMemoryTraceEvent,
     SupervisorTraceEvent,
     build_engineering_planning_context,
@@ -85,6 +92,7 @@ class SupervisorAgent(BaseAgent):
         aggregator: SupervisorResultAggregator | None = None,
         agents: Iterable[BaseAgent] | None = None,
         knowledge_gateway: KnowledgeGateway | None = None,
+        knowledge_intelligence_port: KnowledgeIntelligencePort | None = None,
         knowledge_query_builder: KnowledgeQueryBuilder | None = None,
         memory_retriever: EngineeringMemoryRetriever | None = None,
         memory_binding: MemoryRetrievalRequest | None = None,
@@ -111,6 +119,7 @@ class SupervisorAgent(BaseAgent):
         self._integration_executor = AgentExecutor(self._dispatcher)
         self._integration_aggregator = ResultAggregator()
         self._knowledge_gateway = knowledge_gateway
+        self._knowledge_intelligence_port = knowledge_intelligence_port
         self._knowledge_query_builder = (
             knowledge_query_builder
             if knowledge_query_builder is not None
@@ -135,6 +144,7 @@ class SupervisorAgent(BaseAgent):
         planning_context: EngineeringPlanningContext | None = None
         memory_trace: list[SupervisorMemoryTraceEvent] = []
         fallback_trace: list[SupervisorFallbackTraceEvent] = []
+        knowledge_trace: list[SupervisorKnowledgeTraceEvent] = []
         if not isinstance(task, AgentTask):
             return self._safe_failure(
                 SupervisorAnalysisError,
@@ -142,6 +152,7 @@ class SupervisorAgent(BaseAgent):
                 results,
                 memory_trace=memory_trace,
                 fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
             )
         try:
             safe_task = self._safe_task(task)
@@ -185,6 +196,7 @@ class SupervisorAgent(BaseAgent):
                 results,
                 memory_trace=memory_trace,
                 fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
             )
 
         ranked_memory_context: RankedMemoryContext | None = None
@@ -240,7 +252,75 @@ class SupervisorAgent(BaseAgent):
                     )
                 )
 
-        if self._knowledge_gateway is not None:
+        intelligence_knowledge_context: PlanningKnowledgeContext | None = None
+        if self._knowledge_intelligence_port is not None:
+            try:
+                query = self._knowledge_query_builder.build(
+                    analyzed.model_copy(deep=True)
+                )
+                if not isinstance(query, KnowledgeQuery):
+                    raise TypeError("knowledge query builder returned an invalid query")
+                retrieve = getattr(self._knowledge_intelligence_port, "retrieve", None)
+                if not callable(retrieve):
+                    raise TypeError("knowledge intelligence port is unavailable")
+                raw_intelligence = retrieve(
+                    EngineeringKnowledgeRequest(
+                        request_id=safe_task.task_id,
+                        query_summary=query.query,
+                    )
+                )
+                if not isinstance(raw_intelligence, KnowledgeIntelligenceResult):
+                    raise TypeError("knowledge intelligence result is invalid")
+                intelligence = KnowledgeIntelligenceResult.model_validate(
+                    copy.deepcopy(raw_intelligence)
+                )
+                intelligence_knowledge_context = (
+                    self._planning_verified_knowledge_context(
+                        intelligence.verified_evidence
+                    )
+                )
+                knowledge_trace.append(
+                    SupervisorKnowledgeTraceEvent(
+                        sequence=1,
+                        stage="retrieval",
+                        status="success",
+                        count=len(intelligence.verified_evidence),
+                        source_type=self._knowledge_source_summary(
+                            intelligence.verified_evidence
+                        ),
+                    )
+                )
+            except Exception:
+                intelligence_knowledge_context = None
+                knowledge_trace.append(
+                    SupervisorKnowledgeTraceEvent(
+                        sequence=1,
+                        stage="retrieval",
+                        status="failed",
+                        count=0,
+                        source_type="none",
+                    )
+                )
+                memory_count = (
+                    len(ranked_memory_context.records)
+                    if ranked_memory_context is not None
+                    else 0
+                )
+                fallback_trace.extend(
+                    (
+                        SupervisorFallbackTraceEvent(
+                            event="knowledge_failed",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                    )
+                )
+        elif self._knowledge_gateway is not None:
             try:
                 query, gateway_query, before, trace, domains = (
                     self._prepare_knowledge_query(analyzed)
@@ -270,6 +350,7 @@ class SupervisorAgent(BaseAgent):
                         results,
                         memory_trace=memory_trace,
                         fallback_trace=fallback_trace,
+                        knowledge_trace=knowledge_trace,
                     )
                 execution_context = None
                 memory_count = (
@@ -292,11 +373,16 @@ class SupervisorAgent(BaseAgent):
                     )
                 )
 
-        if self._memory_binding is not None:
+        if (
+            self._memory_binding is not None
+            or self._knowledge_intelligence_port is not None
+        ):
             try:
                 planning_context = build_engineering_planning_context(
-                    knowledge_context=self._planning_knowledge_context(
-                        execution_context
+                    knowledge_context=(
+                        intelligence_knowledge_context
+                        if self._knowledge_intelligence_port is not None
+                        else self._planning_knowledge_context(execution_context)
                     ),
                     memory_context=ranked_memory_context,
                 )
@@ -377,6 +463,7 @@ class SupervisorAgent(BaseAgent):
                 results,
                 memory_trace=memory_trace,
                 fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
             )
 
         try:
@@ -395,6 +482,7 @@ class SupervisorAgent(BaseAgent):
                 results,
                 memory_trace=memory_trace,
                 fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
             )
 
         try:
@@ -431,6 +519,7 @@ class SupervisorAgent(BaseAgent):
                 results,
                 memory_trace=memory_trace,
                 fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
             )
 
         metadata: dict[str, object] = {
@@ -448,6 +537,10 @@ class SupervisorAgent(BaseAgent):
         if fallback_trace:
             metadata["fallback_trace"] = [
                 event.model_dump(mode="json") for event in fallback_trace
+            ]
+        if knowledge_trace:
+            metadata["knowledge_trace"] = [
+                event.model_dump(mode="json") for event in knowledge_trace
             ]
         return AgentResult(
             agent_name=self.name,
@@ -507,6 +600,36 @@ class SupervisorAgent(BaseAgent):
                 )
             )
         return PlanningKnowledgeContext(sources=tuple(sources))
+
+    @staticmethod
+    def _planning_verified_knowledge_context(
+        evidence: tuple[VerifiedKnowledgeEvidence, ...],
+    ) -> PlanningKnowledgeContext:
+        sources = tuple(
+            PlanningKnowledgeEvidence(
+                source_id=item.evidence_id,
+                source_type=item.provenance[0].source_type,
+                reference=item.provenance[0].reference,
+                trust_level=1.0,
+            )
+            for item in evidence
+        )
+        return PlanningKnowledgeContext(sources=sources)
+
+    @staticmethod
+    def _knowledge_source_summary(
+        evidence: tuple[VerifiedKnowledgeEvidence, ...],
+    ) -> str:
+        source_types = {
+            provenance.source_type.value
+            for item in evidence
+            for provenance in item.provenance
+        }
+        if not source_types:
+            return "none"
+        if len(source_types) == 1:
+            return next(iter(source_types))
+        return "mixed"
 
     def _prepare_knowledge_query(
         self,
@@ -700,6 +823,7 @@ class SupervisorAgent(BaseAgent):
         *,
         memory_trace: list[SupervisorMemoryTraceEvent] | None = None,
         fallback_trace: list[SupervisorFallbackTraceEvent] | None = None,
+        knowledge_trace: list[SupervisorKnowledgeTraceEvent] | None = None,
     ) -> AgentResult:
         messages: dict[type[SupervisorIntelligenceError], str] = {
             SupervisorAnalysisError: "supervisor requirement analysis failed",
@@ -727,6 +851,10 @@ class SupervisorAgent(BaseAgent):
         if fallback_trace:
             metadata["fallback_trace"] = [
                 event.model_dump(mode="json") for event in fallback_trace
+            ]
+        if knowledge_trace:
+            metadata["knowledge_trace"] = [
+                event.model_dump(mode="json") for event in knowledge_trace
             ]
         return AgentResult(
             agent_name=cls.name,
