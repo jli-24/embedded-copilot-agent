@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.42.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.43.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -57,6 +57,11 @@ projection、Engineering Planning Agent、Frozen Task DAG、Human Approval、Det
 和 Progress Events 组合为确定性的工作流准备边界。该 Runtime 不执行任务，也不调用 Tool、构建、
 Flash、文件写入或硬件控制能力。
 
+v0.43.0 新增 controlled-execution Agent Execution Layer，将显式 Workflow Task projection、精确
+Agent Registry binding、typed Agent boundary、Verification projection 和 fail-safe Execution Snapshot
+组合为受控执行边界。失败执行最多允许一次两阶段人工恢复，不自动重试、不调用 Tool Runtime，
+也不执行 Build、Flash 或 Hardware Debug。
+
 当前可分析的领域包括：
 
 - Datasheet analysis
@@ -88,6 +93,34 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.43 Architecture
+
+```text
+Workflow Task
+  -> Execution Adapter
+  -> AgentExecutionRequest
+  -> Agent Registry
+  -> Agent Capability Binding
+  -> Agent Execution Boundary
+  -> Verification Projection
+  -> Execution Snapshot
+```
+
+Agent type、execution ID、context references、constraints 和 timestamp 均由调用方显式提供；
+Runtime 不从任务文本推断 Agent，也不持久化 capability port、prompt、reasoning 或 raw output。
+
+## v0.43 Highlights
+
+- Controlled Agent Execution Runtime
+- Explicit Agent Registry Binding
+- Execution Lifecycle State Machine
+- Safe Result Projection
+- Verification Boundary
+- Fail-safe Execution Snapshot
+- Two-phase Human Resume
+- Progress Event Isolation
+- Security Boundary
 
 ## v0.42 Architecture
 

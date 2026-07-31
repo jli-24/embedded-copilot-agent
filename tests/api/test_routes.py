@@ -104,7 +104,7 @@ def test_health_paths_report_v041(path: str) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "version": "0.42.0",
+        "version": "0.43.0",
         "mode": "offline",
     }
 

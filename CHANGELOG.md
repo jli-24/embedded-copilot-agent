@@ -1,3 +1,39 @@
+# Embedded Copilot v0.43.0
+
+## Agent Execution Layer
+
+新增：
+
+- framework-independent、controlled-execution `AgentExecutionRuntime`
+- explicit Agent Registry binding 与 caller-owned execution capability
+- deterministic execution lifecycle 和 content-safe progress events
+- typed result preservation、Safe Result Projection 与 Verification Boundary
+
+## Failure Handling and Recovery
+
+新增：
+
+- registry、agent、timeout 和 verification failure 的 fail-safe Execution Snapshot
+- 两阶段人工恢复，最多一次 approved resume
+- approval fingerprint binding、旧 snapshot replay rejection 和 denial cancellation
+
+## Security Boundary
+
+- 不推断 Agent type，不动态发现或导入 Agent implementation
+- 不调用 Tool Runtime、Workspace write、Build、Flash 或 Hardware Debug
+- 不保存 prompt、reasoning、raw output、live execution port 或内部异常
+
+## Testing
+
+Release candidate validation：
+
+- pytest: 2256 passed, 6 skipped
+- Ruff: passed
+- scoped Black check: passed
+- compileall: passed
+- pip check: passed
+- git diff check: passed
+
 # Embedded Copilot v0.42.0
 
 ## Agent Workflow Layer

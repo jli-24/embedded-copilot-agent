@@ -1,23 +1,6 @@
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
-
-from embedded_copilot import __version__
-from embedded_copilot.core.config import Settings
-from embedded_copilot.schemas.api import HealthResponse
-
-
-def test_v042_release_metadata_is_synchronized() -> None:
-    project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
-    health_schema = HealthResponse.model_json_schema()
-
-    assert project["version"] == __version__ == Settings().version == "0.42.0"
-    assert HealthResponse(status="ok", mode="offline").version == "0.42.0"
-    assert health_schema["properties"]["version"]["const"] == "0.42.0"
-    assert health_schema["properties"]["version"]["default"] == "0.42.0"
 
 
 def test_v042_release_documentation_is_complete_and_historical() -> None:
@@ -26,7 +9,7 @@ def test_v042_release_documentation_is_complete_and_historical() -> None:
     release = Path("docs/release/v0.42.0.md").read_text(encoding="utf-8")
     workflow = Path("docs/v0.42-agent-workflow.md").read_text(encoding="utf-8")
 
-    assert "Embedded Copilot Agent v0.42.0" in readme
+    assert "v0.42.0 新增 planning-only Agent Workflow Layer" in readme
     assert "## v0.42 Architecture" in readme
     assert "## v0.42 Highlights" in readme
     assert "## v0.41 Architecture" in readme
