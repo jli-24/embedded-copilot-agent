@@ -1,10 +1,15 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.43.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.44.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
 ## Overview
+
+v0.44.0 新增 framework-independent、approval-controlled Engineering Generation Layer，
+将已验证的 Workflow Task 与 Agent Execution Result 显式投影为可审查的工程 Artifact
+Proposal。该层只生成结构化提案和 Approved Artifact Reference，不写入工程文件、不调用
+Tool Runtime，也不执行 Build、Flash、Hardware Debug 或真实 PCB 生成。
 
 系统接收工程需求与 metadata-only 附件描述，由 Supervisor 规划已有领域 Agent，最终返回
 唯一的跨 API 分析结果 `EngineeringReport`。v0.20.0 新增独立 Evaluation Layer、四视图
@@ -93,6 +98,34 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.44 Architecture
+
+```text
+Requirement
+  -> Workflow
+  -> Agent Execution
+  -> Engineering Generation
+  -> Artifact Proposal
+  -> Verification
+  -> Human Approval
+```
+
+Generator 通过显式 Registry capability binding 注入；Runtime 不扫描模块、不自动 fallback，
+也不持有 generator lifecycle。所有 Hardware、Firmware、PCB 与 BOM 输出均为带指纹、待验证、
+待人工审批的结构化 proposal，不代表真实工程文件或硬件结果。
+
+## v0.44 Highlights
+
+- Engineering Generation Runtime
+- Generator Registry Boundary
+- Hardware Design Proposal
+- Firmware Proposal
+- PCB Design Proposal
+- BOM Proposal
+- Artifact Verification Boundary
+- Human Approval Boundary
+- Security Isolation
 
 ## v0.43 Architecture
 

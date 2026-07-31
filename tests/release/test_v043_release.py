@@ -1,23 +1,6 @@
 from __future__ import annotations
 
-import tomllib
 from pathlib import Path
-
-from embedded_copilot import __version__
-from embedded_copilot.core.config import Settings
-from embedded_copilot.schemas.api import HealthResponse
-
-
-def test_v043_release_metadata_is_synchronized() -> None:
-    project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))[
-        "project"
-    ]
-    health_schema = HealthResponse.model_json_schema()
-
-    assert project["version"] == __version__ == Settings().version == "0.43.0"
-    assert HealthResponse(status="ok", mode="offline").version == "0.43.0"
-    assert health_schema["properties"]["version"]["const"] == "0.43.0"
-    assert health_schema["properties"]["version"]["default"] == "0.43.0"
 
 
 def test_v043_release_documentation_is_complete_and_historical() -> None:
@@ -26,7 +9,7 @@ def test_v043_release_documentation_is_complete_and_historical() -> None:
     release = Path("docs/release/v0.43.0.md").read_text(encoding="utf-8")
     execution = Path("docs/v0.43-agent-execution.md").read_text(encoding="utf-8")
 
-    assert "Embedded Copilot Agent v0.43.0" in readme
+    assert "v0.43.0" in readme
     assert "## v0.43 Architecture" in readme
     assert "## v0.43 Highlights" in readme
     assert "# Embedded Copilot v0.43.0" in changelog

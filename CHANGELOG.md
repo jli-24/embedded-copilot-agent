@@ -1,3 +1,19 @@
+# Embedded Copilot v0.44.0
+
+## Engineering Generation Layer
+
+新增：
+
+- framework-independent、approval-controlled Engineering Generation Runtime
+- exact Generator capability binding 与无 fallback Registry boundary
+- immutable、fingerprinted Artifact Proposal model
+- Hardware/Firmware/PCB/BOM typed generation boundary
+- independent Verification lifecycle 与 Human Approval workflow
+- content-safe progress events 与 Security Isolation boundary
+
+本版本只产生可审查的工程提案和 Approved Artifact Reference，不生成真实 PCB 文件、不修改工程
+文件，也不执行 Build、Flash、Hardware Debug 或 Tool Runtime capability。
+
 # Embedded Copilot v0.43.0
 
 ## Agent Execution Layer
