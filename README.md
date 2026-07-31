@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.39.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.40.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -74,6 +74,50 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.40 Architecture
+
+```text
+User
+  |
+  v
+Supervisor Agent
+  |
+  v
+Knowledge Gateway
+  |-- RAG
+  |-- Engineering Memory
+  `-- Context Fusion
+  |
+  v
+Planning Context
+  |
+  v
+Engineering Agents
+  |-- Hardware
+  |-- Firmware
+  |-- PCB
+  `-- Debug
+  |
+  v
+Verification
+  |
+  v
+Runtime Execution
+```
+
+v0.40 的 Engineering Memory 是 read-side enhancement：仅将已验证记忆投影为确定性的
+规划上下文，并与 Knowledge Gateway 结果融合。LLM 和 Agent 不能直接修改 Memory、文件或
+工程状态；Workspace Runtime 仍是唯一文件写边界。
+
+## v0.40 Highlights
+
+- Multi-Agent Engineering Workflow
+- Memory-Augmented Reasoning
+- Knowledge Fusion
+- Failure-safe Supervisor
+- Security Boundary
+- Regression Validation
 
 ## Features
 

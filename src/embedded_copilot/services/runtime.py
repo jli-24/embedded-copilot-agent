@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -12,6 +13,7 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from embedded_copilot.agents.debug import DebugAgent
 from embedded_copilot.agents.firmware import FirmwareAgent
 from embedded_copilot.agents.knowledge import KnowledgeAgent
+from embedded_copilot.agents.types import AgentTask
 from embedded_copilot.agents.workflow import build_workflow
 from embedded_copilot.rag.embedding import EmbeddingProvider, HashEmbedding
 from embedded_copilot.rag.hybrid_retriever import HybridRetriever
@@ -51,6 +53,7 @@ def build_analysis_service(settings: Settings) -> AnalysisService:
     )
     from embedded_copilot.debug.agent import DebugAgent as FoundationDebugAgent
     from embedded_copilot.engineering.adapter import (
+        _ENVELOPE_KEY,
         EngineeringSupervisorAdapter,
         RealEngineeringInputAdapter,
     )
@@ -63,6 +66,7 @@ def build_analysis_service(settings: Settings) -> AnalysisService:
         EngineeringExtensionSettings,
         real_pdf_backend_available,
     )
+    from embedded_copilot.engineering.models import RealEngineeringEnvelope
     from embedded_copilot.engineering.resolver import TrustedEngineeringResolver
     from embedded_copilot.firmware.agent import FirmwareAgent as FoundationFirmwareAgent
     from embedded_copilot.hardware.agent import HardwareAgent
@@ -72,6 +76,18 @@ def build_analysis_service(settings: Settings) -> AnalysisService:
     from embedded_copilot.pcb.agent import PCBAgent
 
     extension = EngineeringExtensionSettings.from_environment()
+
+    class _EngineeringExtensionSupervisor(SupervisorAgent):
+        @staticmethod
+        def _safe_task(value: AgentTask) -> AgentTask:
+            engineering_envelope = copy.deepcopy(value.metadata.get(_ENVELOPE_KEY))
+            safe_task = SupervisorAgent._safe_task(value)
+            if not isinstance(engineering_envelope, RealEngineeringEnvelope):
+                return safe_task
+            metadata = copy.deepcopy(safe_task.metadata)
+            metadata[_ENVELOPE_KEY] = engineering_envelope
+            return safe_task.model_copy(update={"metadata": metadata}, deep=True)
+
     supervisor: object = SupervisorAgent(
         agents=(
             FoundationFirmwareAgent(),
@@ -82,7 +98,7 @@ def build_analysis_service(settings: Settings) -> AnalysisService:
     )
     if extension.input_root is not None and real_pdf_backend_available():
         supervisor = EngineeringSupervisorAdapter(
-            delegate=SupervisorAgent(
+            delegate=_EngineeringExtensionSupervisor(
                 agents=(
                     FirmwareAgentInputAdapter(FoundationFirmwareAgent()),
                     HardwareBlueprintProjectionAgentAdapter(

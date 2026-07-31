@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from pydantic import ValidationError
 
@@ -21,6 +21,90 @@ from embedded_copilot.supervisor.knowledge_adapters import (
     knowledge_provenance,
 )
 from embedded_copilot.supervisor.models import SupervisorPlan
+
+
+_SENSITIVE_AGENT_RESULT_METADATA_FRAGMENTS = (
+    "approval",
+    "audit",
+    "evidence",
+    "exception",
+    "finding",
+    "fingerprint",
+    "memory",
+    "payload",
+    "permission",
+    "provider",
+    "ranking",
+    "record_id",
+    "traceback",
+    "verification",
+)
+_OMIT_AGENT_RESULT_METADATA = object()
+
+
+def _normalized_metadata_key(value: object) -> str | None:
+    if type(value) is not str:
+        return None
+    return value.strip().casefold().replace("-", "_").replace(" ", "_")
+
+
+def _is_sensitive_metadata_key(value: object) -> bool:
+    normalized = _normalized_metadata_key(value)
+    return normalized is None or any(
+        fragment in normalized
+        for fragment in _SENSITIVE_AGENT_RESULT_METADATA_FRAGMENTS
+    )
+
+
+def _contains_sensitive_metadata(value: object) -> bool:
+    if isinstance(value, Mapping):
+        return any(
+            _is_sensitive_metadata_key(key) or _contains_sensitive_metadata(item)
+            for key, item in value.items()
+        )
+    if type(value) in (list, tuple):
+        return any(_contains_sensitive_metadata(item) for item in value)
+    return type(value) not in (bool, float, int, str, type(None))
+
+
+def _project_safe_metadata_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        projected: dict[str, object] = {}
+        for key, item in value.items():
+            normalized = _normalized_metadata_key(key)
+            if normalized is None or _is_sensitive_metadata_key(normalized):
+                continue
+            checked = _project_safe_metadata_value(item)
+            if checked is not _OMIT_AGENT_RESULT_METADATA:
+                projected[key] = checked
+        return projected
+    if type(value) is list:
+        return [
+            checked
+            for item in value
+            if (checked := _project_safe_metadata_value(item))
+            is not _OMIT_AGENT_RESULT_METADATA
+        ]
+    if type(value) is tuple:
+        return tuple(
+            checked
+            for item in value
+            if (checked := _project_safe_metadata_value(item))
+            is not _OMIT_AGENT_RESULT_METADATA
+        )
+    if type(value) in (bool, float, int, str, type(None)):
+        return copy.deepcopy(value)
+    return _OMIT_AGENT_RESULT_METADATA
+
+
+def _sanitize_agent_result(result: AgentResult) -> AgentResult:
+    if not _contains_sensitive_metadata(result.metadata):
+        return result
+    checked = _project_safe_metadata_value(result.metadata)
+    projected = checked if isinstance(checked, dict) else {}
+    payload = result.model_dump(mode="python")
+    payload["metadata"] = projected
+    return AgentResult.model_validate(payload)
 
 
 class AgentDispatcher:
@@ -174,7 +258,7 @@ class AgentDispatcher:
                 raise TypeError("agent returned an invalid result")
             if result.agent_name != expected_name:
                 raise ValueError("agent result name mismatch")
-            return result
+            return _sanitize_agent_result(result)
         except Exception:
             return cls._safe_error(expected_name)
 
