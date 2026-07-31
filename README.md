@@ -1,6 +1,6 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.41.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.42.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
@@ -52,6 +52,11 @@ v0.41.0 新增 read-only Knowledge Intelligence Layer，提供注入式 Web Rese
 Graph Snapshot 和只投影 candidate 的 Memory Bridge。Knowledge Graph 只辅助 Planning，不能生成
 任务、选择 Agent、构造 `SupervisorPlan` 或触发执行。
 
+v0.42.0 新增 planning-only Agent Workflow Layer，将 caller-owned requirement、可信 Context/Risk
+projection、Engineering Planning Agent、Frozen Task DAG、Human Approval、Deterministic Scheduler
+和 Progress Events 组合为确定性的工作流准备边界。该 Runtime 不执行任务，也不调用 Tool、构建、
+Flash、文件写入或硬件控制能力。
+
 当前可分析的领域包括：
 
 - Datasheet analysis
@@ -83,6 +88,37 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.42 Architecture
+
+```text
+Requirement Agent Port
+  -> Requirement Specification
+  -> Workflow Context Projection
+  -> Risk Projection Boundary
+  -> Engineering Planning Agent
+  -> Frozen Task DAG
+  -> Human Approval
+  -> Deterministic Scheduler
+  -> Progress Events
+```
+
+`WorkflowContextPort` 是外部 composition boundary；Knowledge、Memory 和未来 Project Context
+adapter 可以在其后组合，但 Workflow Runtime 只接收安全的 `WorkflowContextProjection`。
+Risk 仅供 Planning visibility、人工审批和 progress/reporting 使用，不改变 task priority、
+scheduling order、DAG dependency 或 Agent selection。
+
+## v0.42 Highlights
+
+- Requirement Agent Port
+- Workflow Context Projection
+- Risk Projection Boundary
+- Engineering Planning Agent
+- Frozen Task DAG
+- Human Approval
+- Deterministic Scheduler
+- Progress Events
+- Security Boundary
 
 ## v0.41 Architecture
 

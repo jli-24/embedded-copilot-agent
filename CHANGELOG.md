@@ -1,3 +1,43 @@
+# Embedded Copilot v0.42.0
+
+## Agent Workflow Layer
+
+新增：
+
+- framework-independent、planning-only `WorkflowRuntime`
+- injected Requirement Agent、Workflow Context 和 Engineering Planning ports
+- typed output preservation、deep-copy revalidation 与 deterministic fingerprints
+- strict `WorkflowRiskProjection` 和 verified source binding
+
+## Task DAG and Scheduling
+
+新增：
+
+- immutable Frozen Task DAG
+- missing dependency、duplicate edge、self-edge 和 cycle validation
+- deterministic Kahn scheduling batches
+- Risk 与 task priority、scheduling order、DAG mutation 和 Agent selection 隔离
+
+## Human Approval and Progress
+
+新增：
+
+- whole-workflow approval binding
+- approval 前停止于 `WAITING_APPROVAL`
+- caller-timestamped、content-safe Progress Events
+- progress sink fail-closed boundary
+
+## Security Boundary
+
+- 不执行 task、Tool、build、firmware/PCB generation、Flash 或 hardware control
+- 不导入 Supervisor、Knowledge 或 Engineering Memory 内部实现
+- 不读取 filesystem、network、database、environment 或 system clock
+- 不缓存、不持久化，不生成 ID，不启动 background task
+
+## Testing
+
+Release Preparation validation 将在 release commit/tag 前完成并记录。
+
 # Embedded Copilot v0.41.0
 
 ## Knowledge Intelligence Layer
