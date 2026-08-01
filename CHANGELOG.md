@@ -1,3 +1,22 @@
+# Embedded Copilot v0.47.0
+
+## Hardware Intelligence Layer
+
+新增：
+
+- framework-independent、observation-only Hardware Intelligence Runtime
+- immutable hardware intelligence contracts and deterministic fingerprints
+- caller-owned Digital Twin Boundary with no built-in transport
+- reference-only HIL Projection Boundary
+- structured, finite Hardware Observation model
+- approval-bound Validation Projection
+- safe projection from verified Execution Integration snapshots
+- framework, device, transport, persistence, and mutation Security Boundary
+
+本版本不提供 physical hardware control、USB、Serial、Flash、Debug、real HIL
+execution 或 physical hardware validation。`VALIDATED` 仅表示注入的结构、模拟、
+阈值与 contract validation 已通过，不表示真实设备或电气设计已经验证。
+
 # Embedded Copilot v0.46.0
 
 ## Execution Integration Layer

@@ -1,10 +1,17 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.46.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.47.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
 ## Overview
+
+v0.47.0 adds a framework-independent, observation-only Hardware Intelligence
+Layer. It combines caller-owned Digital Twin projections, structured Hardware
+Observation values, HIL reference projections, approval-bound Validation
+Projection, and safe Execution Integration into immutable snapshots. It does not
+perform physical hardware control, USB or Serial communication, Flash, Debug,
+real HIL execution, or physical hardware validation.
 
 v0.46.0 adds a framework-independent Execution Integration Layer. It converts a
 successful Agent Execution Snapshot and reviewed Proposal Projection into a
@@ -111,6 +118,35 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.47 Hardware Intelligence Layer
+
+```text
+SUCCESS ExecutionSnapshot
+  -> safe Hardware Context Projection
+  -> Digital Twin Boundary
+  -> structured Hardware Observation
+  -> HIL Projection Boundary
+  -> approval-bound Validation Projection
+  -> immutable Hardware Intelligence Snapshot
+```
+
+The Hardware Intelligence Runtime accepts only caller-owned typed projection
+ports. Execution Integration projects safe identifiers from a verified execution
+snapshot without reading artifact bodies. A validated projection is software
+evidence only and is not a claim of physical hardware validation.
+
+## v0.47 Highlights
+
+- Hardware Intelligence Runtime
+- Digital Twin Boundary
+- HIL Projection Boundary
+- Hardware Observation
+- Validation Projection
+- Execution Integration
+- Deterministic fingerprint binding
+- Content-safe progress events
+- Security Boundary
 
 ## v0.46 Architecture
 
