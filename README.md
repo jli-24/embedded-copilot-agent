@@ -1,10 +1,17 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.47.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.48.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
 ## Overview
+
+v0.48.0 adds a framework-independent, deterministic, proposal-only Optimization
+Layer. It converts typed Hardware Observation projections into bounded
+mathematical candidates, performs deterministic evaluation, and requires Human
+Approval before returning a reviewed immutable result. It provides mathematical
+candidate only behavior: no hardware control, no real tuning, and no measurement
+capability.
 
 v0.47.0 adds a framework-independent, observation-only Hardware Intelligence
 Layer. It combines caller-owned Digital Twin projections, structured Hardware
@@ -118,6 +125,35 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.48 Optimization Layer
+
+```text
+Hardware Observation Projection
+  -> Optimization Plan
+  -> Unverified Optimization Proposal
+  -> Deterministic Evaluation Projection
+  -> Human Approval
+  -> Reviewed Optimization Result
+```
+
+The Optimization Runtime uses exact registry binding and deterministic PID,
+Power, and Performance mathematical models. Proposals remain explicitly
+unverified until deterministic evaluation and Human Approval are complete.
+Approval reviews a mathematical candidate only; it does not execute an action,
+control hardware, perform real tuning, or measure a device.
+
+## v0.48 Highlights
+
+- Optimization Runtime
+- exact registry binding with no fallback
+- PID mathematical candidate projection
+- Power mathematical model
+- Performance mathematical model
+- Deterministic Evaluation Projection
+- Human Approval binding
+- process-local Replay Protection
+- Security Boundary
 
 ## v0.47 Hardware Intelligence Layer
 

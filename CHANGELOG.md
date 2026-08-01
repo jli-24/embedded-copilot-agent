@@ -1,3 +1,20 @@
+# Embedded Copilot v0.48.0
+
+## Optimization Layer
+
+新增：
+
+- framework-independent、proposal-only Optimization Runtime
+- exact registry binding，不提供 fallback 或动态 discovery
+- stateless PID、Power 与 Performance mathematical models
+- deterministic evaluation projection，不生成 total score
+- fingerprint-bound Human Approval flow
+- process-local duplicate/replay protection
+- framework、filesystem、network、device 与控制能力 Security Boundary
+
+本版本只生成 unverified mathematical candidate，不提供 hardware control、real
+tuning、measurement capability、Flash、Debug、Serial、USB 或 firmware mutation。
+
 # Embedded Copilot v0.47.0
 
 ## Hardware Intelligence Layer
