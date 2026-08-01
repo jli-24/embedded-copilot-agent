@@ -1,10 +1,18 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.45.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.46.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
 ## Overview
+
+v0.46.0 adds a framework-independent Execution Integration Layer. It converts a
+successful Agent Execution Snapshot and reviewed Proposal Projection into a
+fingerprinted Execution Plan, binds one exact caller-owned executor, requires a
+typed Human Approval proof, verifies the safe result projection, and returns a
+terminal Execution Snapshot. The production package provides no real executor and
+does not perform Build, Flash, Hardware Debug, Shell, Git, network, filesystem
+mutation, or hardware control.
 
 v0.45.0 新增 framework-independent、human-controlled Human Loop Layer，将 metadata-only
 Engineering Generation Proposal 显式绑定到 Human Review Lifecycle、Feedback Projection、
@@ -103,6 +111,38 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.46 Architecture
+
+```text
+SUCCESS AgentExecutionSnapshot + ProposalProjection
+  -> ExecutionPreparationRequest
+  -> Execution Plan
+  -> exact Executor Registry Boundary
+  -> READY ExecutionSnapshot
+  -> Human Approval Binding
+  -> Controlled Execution Lifecycle
+  -> Verification Projection
+  -> terminal ExecutionSnapshot
+```
+
+Executor selection is explicit and exact. Human Review approval binds the READY
+snapshot and proposal before the process-local single-use execution boundary is
+consumed. Failure paths return sanitized terminal snapshots; invalid contracts,
+binding mismatches, replay, and progress-delivery failures fail closed.
+
+## v0.46 Highlights
+
+- Execution Runtime
+- Executor Registry Boundary
+- Execution Plan
+- Human Approval Binding
+- Controlled Execution Lifecycle
+- Verification Projection
+- Failure Snapshot
+- Replay Protection
+- Progress Event Isolation
+- Security Boundary
 
 ## v0.45 Architecture
 

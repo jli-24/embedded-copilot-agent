@@ -1,3 +1,23 @@
+# Embedded Copilot v0.46.0
+
+## Execution Integration Layer
+
+新增：
+
+- framework-independent controlled `Execution Runtime`
+- immutable, fingerprinted `Execution Plan` and terminal snapshot contracts
+- one-shot exact `Executor Registry Boundary` with no fallback or discovery
+- typed `Human Approval Binding` to the existing Human Loop review snapshot
+- deterministic `Controlled Execution Lifecycle` and safe progress events
+- result-bound `Verification Projection`
+- sanitized timeout, cancellation, verification, and `Failure Snapshot` handling
+- process-local sequential and concurrent `Replay Protection`
+- framework, transport, filesystem, hardware, and provider `Security Boundary`
+
+本版本只提供受控执行抽象。生产 package 不提供真实 executor，不执行 real Build、
+real Flash、real Hardware Debug、Shell、Git、network、filesystem mutation 或
+hardware control；cross-process replay protection 仍是非目标。
+
 # Embedded Copilot v0.45.0
 
 ## Human Loop Layer
