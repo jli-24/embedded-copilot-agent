@@ -33,5 +33,5 @@ class ChatResponse(ContractModel):
 
 class HealthResponse(ContractModel):
     status: Literal["ok", "degraded"]
-    version: Literal["0.44.0"] = "0.44.0"
+    version: Literal["0.45.0"] = "0.45.0"
     mode: Literal["offline", "llm"]

@@ -1,3 +1,21 @@
+# Embedded Copilot v0.45.0
+
+## Human Loop Layer
+
+新增：
+
+- framework-independent、human-controlled Human Loop Runtime
+- metadata-only Proposal Projection 与 deterministic fingerprint binding
+- explicit Human Review Lifecycle：APPROVED、CHANGES_REQUESTED、REJECTED
+- structured Feedback Projection 与 safe reference boundary
+- verified Knowledge/Memory reference-bound Revision Context
+- reviewable Revision Proposal Boundary
+- content-safe Progress Event Isolation 与 Security Boundary
+
+本版本不提供 automatic approval、artifact mutation、Agent execution、Tool execution、Build、
+Flash、Hardware Debug、Memory writes 或 Knowledge mutation。Revision Proposal 必须重新进入
+Human Review。
+
 # Embedded Copilot v0.44.0
 
 ## Engineering Generation Layer

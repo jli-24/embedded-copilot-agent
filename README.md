@@ -1,15 +1,15 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.44.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
+Embedded Copilot Agent v0.45.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
 边界清晰的 Engineering Copilot。
 
 ## Overview
 
-v0.44.0 新增 framework-independent、approval-controlled Engineering Generation Layer，
-将已验证的 Workflow Task 与 Agent Execution Result 显式投影为可审查的工程 Artifact
-Proposal。该层只生成结构化提案和 Approved Artifact Reference，不写入工程文件、不调用
-Tool Runtime，也不执行 Build、Flash、Hardware Debug 或真实 PCB 生成。
+v0.45.0 新增 framework-independent、human-controlled Human Loop Layer，将 metadata-only
+Engineering Generation Proposal 显式绑定到 Human Review Lifecycle、Feedback Projection、
+Revision Context 和新的 Revision Proposal。该层不自动批准、不修改 Artifact，不调用 Agent 或
+Tool，也不执行 Build、Flash、Hardware Debug、Memory write 或 Knowledge mutation。
 
 系统接收工程需求与 metadata-only 附件描述，由 Supervisor 规划已有领域 Agent，最终返回
 唯一的跨 API 分析结果 `EngineeringReport`。v0.20.0 新增独立 Evaluation Layer、四视图
@@ -67,6 +67,11 @@ Agent Registry binding、typed Agent boundary、Verification projection 和 fail
 组合为受控执行边界。失败执行最多允许一次两阶段人工恢复，不自动重试、不调用 Tool Runtime，
 也不执行 Build、Flash 或 Hardware Debug。
 
+v0.44.0 新增 framework-independent、approval-controlled Engineering Generation Layer，
+将已验证的 Workflow Task 与 Agent Execution Result 显式投影为可审查的工程 Artifact
+Proposal。该层只生成结构化提案和 Approved Artifact Reference，不写入工程文件、不调用
+Tool Runtime，也不执行 Build、Flash、Hardware Debug 或真实 PCB 生成。
+
 当前可分析的领域包括：
 
 - Datasheet analysis
@@ -98,6 +103,34 @@ Synthetic BenchmarkDataset
 
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+
+## v0.45 Architecture
+
+```text
+Engineering Generation Proposal
+  -> metadata-only Proposal Projection
+  -> Human Review Lifecycle
+  -> APPROVED / CHANGES_REQUESTED / REJECTED
+  -> Feedback Projection
+  -> Revision Context
+  -> Revision Proposal Boundary
+  -> Human Review again
+```
+
+Human Loop Runtime 只处理 typed、fingerprinted projection。人工决策不会执行修改；结构化
+feedback 不被解释为命令，revision 也不会覆盖原始 Artifact，而是形成必须重新进入人工审核的
+新 proposal。Progress event 仅包含状态和 caller-provided timestamp，交付失败时 fail closed。
+
+## v0.45 Highlights
+
+- Human Loop Runtime
+- Human Review Lifecycle
+- Metadata-only Proposal Projection
+- Feedback Projection
+- Revision Context
+- Revision Proposal Boundary
+- Progress Event Isolation
+- Security Boundary
 
 ## v0.44 Architecture
 
