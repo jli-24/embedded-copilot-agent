@@ -1,0 +1,81 @@
+"""Framework-independent, proposal-only Engineering Artifact Layer."""
+
+from embedded_copilot.engineering_artifacts.contracts import EngineeringArtifactPort
+from embedded_copilot.engineering_artifacts.exceptions import (
+    EngineeringArtifactError,
+    EngineeringArtifactRejected,
+)
+from embedded_copilot.engineering_artifacts.facade import EngineeringArtifactRuntime
+from embedded_copilot.engineering_artifacts.factory import (
+    create_engineering_artifact_runtime,
+)
+from embedded_copilot.engineering_artifacts.integration.inputs import (
+    EngineeringGenerationRequest,
+)
+from embedded_copilot.engineering_artifacts.models import (
+    ArtifactContractEntry,
+    ArtifactFindingCode,
+    ArtifactReviewProjection,
+    ArtifactReviewState,
+    ArtifactSourceBinding,
+    ArtifactSourceReference,
+    ArtifactSourceType,
+    ArtifactStatus,
+    ArtifactType,
+    CodeSkeletonProjection,
+    ConstraintCategory,
+    EngineeringArtifactContract,
+    EngineeringGenerationReport,
+    FirmwareArtifactProjection,
+    FirmwareModuleArtifact,
+    FirmwareModuleGroup,
+    FirmwareModuleKind,
+    HardwareArtifactProjection,
+    PCBConstraintArtifact,
+    PCBConstraintArtifactItem,
+    SchematicIntentArtifact,
+    UnifiedComponent,
+    UnifiedConstraint,
+    UnifiedHardwareModel,
+    UnifiedInterface,
+    ValidationAcquisitionStatus,
+    artifact_source_fingerprint,
+    engineering_generation_report_fingerprint,
+)
+
+__all__ = (
+    "ArtifactContractEntry",
+    "ArtifactFindingCode",
+    "ArtifactReviewProjection",
+    "ArtifactReviewState",
+    "ArtifactSourceBinding",
+    "ArtifactSourceReference",
+    "ArtifactSourceType",
+    "ArtifactStatus",
+    "ArtifactType",
+    "CodeSkeletonProjection",
+    "ConstraintCategory",
+    "EngineeringArtifactContract",
+    "EngineeringArtifactError",
+    "EngineeringArtifactPort",
+    "EngineeringArtifactRejected",
+    "EngineeringArtifactRuntime",
+    "EngineeringGenerationReport",
+    "EngineeringGenerationRequest",
+    "FirmwareArtifactProjection",
+    "FirmwareModuleArtifact",
+    "FirmwareModuleGroup",
+    "FirmwareModuleKind",
+    "HardwareArtifactProjection",
+    "PCBConstraintArtifact",
+    "PCBConstraintArtifactItem",
+    "SchematicIntentArtifact",
+    "UnifiedComponent",
+    "UnifiedConstraint",
+    "UnifiedHardwareModel",
+    "UnifiedInterface",
+    "ValidationAcquisitionStatus",
+    "artifact_source_fingerprint",
+    "create_engineering_artifact_runtime",
+    "engineering_generation_report_fingerprint",
+)

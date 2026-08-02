@@ -1,3 +1,3 @@
 """Embedded Copilot Agent foundation package."""
 
-__version__ = "0.48.0"
+__version__ = "1.0.0"

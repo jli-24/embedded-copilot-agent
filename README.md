@@ -1,10 +1,22 @@
-# Embedded Copilot Agent
+# Embedded Copilot v1.0.0
 
-Embedded Copilot Agent v0.48.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
-Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
-边界清晰的 Engineering Copilot。
+Embedded Copilot v1.0.0 是面向嵌入式工程师的 AI Embedded Engineer。项目将
+Multi-Agent workflow、结构化 evidence、知识检索、
+确定性工程投影和人工审核边界组合为离线可测、可追踪的 Engineering Copilot。
+
+Embedded Copilot Agent v0.48.0 及更早版本的历史能力和安全边界仍保留在下文中。
 
 ## Overview
+
+v1.0 Product Layer 将 v0.49–v0.57 Engineering Core 聚合为 caller-owned、无状态的
+单项目 `EngineeringWorkspace`。它提供 `ProjectSession`、Dashboard Projection、
+Engineering Timeline 和 `EngineeringReleaseReport`，但不维护 project registry、store、
+cache 或持久化，也不替代各 Runtime 的执行、Memory、Repository 或 Release lifecycle。
+
+v0.49–v0.57 依次覆盖 Engineering Interface、Requirement/Architecture Intelligence、
+Hardware Engineering、Firmware Engineering、Hardware Validation、Engineering Artifact、
+Engineering Execution、Human Feedback Loop 和 Autonomous Optimization Loop。所有跨层输出
+仍保持 immutable、caller-owned、deterministic，并在执行或变更边界保留人工审核。
 
 v0.48.0 adds a framework-independent, deterministic, proposal-only Optimization
 Layer. It converts typed Hardware Observation projections into bounded
@@ -102,6 +114,26 @@ Tool Runtime，也不执行 Build、Flash、Hardware Debug 或真实 PCB 生成�
 - Debug diagnosis
 
 ## Architecture
+
+v1.0 Engineering Core：
+
+```text
+Requirement
+  -> Architecture
+  -> Hardware
+  -> Firmware
+  -> Validation
+  -> Artifact
+  -> Execution
+  -> Feedback
+  -> Optimization
+  -> Engineering Project Report
+```
+
+Product Layer 只聚合各阶段的安全 reference、fingerprint、状态、时间线和决策记录；它不读取
+完整工程 payload，不控制 Supervisor，也不自动调用 Runtime 或修改工程对象。完整流程坚持
+proposal-first、human approval 和 safe execution boundary，不自动制造、不自动修改 PCB，也不提供
+无人值守硬件控制。
 
 ```text
 User / Streamlit
@@ -406,6 +438,9 @@ v0.40 的 Engineering Memory 是 read-side enhancement：仅将已验证记忆�
 
 ## Features
 
+- Caller-owned single-project `EngineeringWorkspace`
+- Immutable `ProjectSession` and deterministic Dashboard Projection
+- Reference-only Engineering Timeline and Engineering Project Report
 - Supervisor-driven Multi-Agent orchestration
 - Local/GitHub Knowledge Provider architecture
 - Metadata-only multimodal input foundation
@@ -421,6 +456,10 @@ v0.40 的 Engineering Memory 是 read-side enhancement：仅将已验证记忆�
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo
+
+v1.0 的文档化端到端场景见
+[`ESP32-S3 Smart Camera Demo`](docs/demo/esp32-s3-smart-camera.md)。该场景展示从 Requirement
+到 Release Report 的安全投影链，不声称真实构建、烧录、设备测量或硬件验证已经执行。
 
 Streamlit 提供四个视图：
 

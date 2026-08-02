@@ -1,3 +1,36 @@
+# Changelog
+
+## v1.0.0
+
+### Added
+
+- Embedded Copilot Product Layer
+- Engineering Workspace
+- Project Session
+- Dashboard Projection
+- Timeline Projection
+- Engineering Release Report
+
+### Completed
+
+- Requirement Intelligence
+- Hardware Engineering
+- Firmware Engineering
+- Hardware Validation
+- Engineering Artifact
+- Engineering Execution
+- Human Feedback Loop
+- Autonomous Optimization Loop
+
+### Validation
+
+- Full pytest passed
+- Security boundary verified
+- Deterministic engineering pipeline
+
+Embedded Copilot v1.0.0 以 proposal-first、human approval 和 safe execution boundary
+为工程闭环边界；不自动制造、不自动修改 PCB，也不提供无人值守硬件控制。
+
 # Embedded Copilot v0.48.0
 
 ## Optimization Layer
