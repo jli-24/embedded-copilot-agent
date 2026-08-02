@@ -7,6 +7,16 @@ from uuid import uuid4
 from embedded_copilot.agents.base import BaseAgent
 from embedded_copilot.agents.types import AgentResult, AgentStatus, AgentTask
 from embedded_copilot.debug.agent import DebugAgent
+from embedded_copilot.engineering_memory.context import (
+    MemoryContext,
+    MemoryRetrievalRequest,
+)
+from embedded_copilot.engineering_memory.context_builder import (
+    RankedMemoryContext,
+    build_memory_context,
+)
+from embedded_copilot.engineering_memory.ranking import RankedMemoryItem
+from embedded_copilot.engineering_memory.retrieval import EngineeringMemoryRetriever
 from embedded_copilot.firmware.agent import FirmwareAgent
 from embedded_copilot.hardware.agent import HardwareAgent
 from embedded_copilot.integration.aggregator import ResultAggregator
@@ -17,15 +27,31 @@ from embedded_copilot.integration.context import (
 )
 from embedded_copilot.integration.executor import AgentExecutor
 from embedded_copilot.integration.planner import IntegrationPlanner
+from embedded_copilot.input.adapters.supervisor import _CONTEXT_KEY
 from embedded_copilot.knowledge.gateway import KnowledgeGateway
+from embedded_copilot.knowledge.intelligence import (
+    EngineeringKnowledgeRequest,
+    KnowledgeIntelligencePort,
+    KnowledgeIntelligenceResult,
+    VerifiedKnowledgeEvidence,
+)
 from embedded_copilot.knowledge.models import KnowledgeQuery, KnowledgeResult
+from embedded_copilot.knowledge.source import project_result
 from embedded_copilot.pcb.agent import PCBAgent
 from embedded_copilot.supervisor.aggregator import SupervisorResultAggregator
 from embedded_copilot.supervisor.analyzer import SupervisorRequirementAnalyzer
 from embedded_copilot.supervisor.context import (
+    EngineeringPlanningContext,
     ExecutionContext,
     KnowledgeContext,
+    PlanningKnowledgeContext,
+    PlanningKnowledgeEvidence,
+    SupervisorFallbackTraceEvent,
+    SupervisorKnowledgeTraceEvent,
+    SupervisorMemoryTraceEvent,
     SupervisorTraceEvent,
+    build_engineering_planning_context,
+    project_safe_supervisor_metadata,
 )
 from embedded_copilot.supervisor.dispatcher import AgentDispatcher
 from embedded_copilot.supervisor.exceptions import (
@@ -66,7 +92,10 @@ class SupervisorAgent(BaseAgent):
         aggregator: SupervisorResultAggregator | None = None,
         agents: Iterable[BaseAgent] | None = None,
         knowledge_gateway: KnowledgeGateway | None = None,
+        knowledge_intelligence_port: KnowledgeIntelligencePort | None = None,
         knowledge_query_builder: KnowledgeQueryBuilder | None = None,
+        memory_retriever: EngineeringMemoryRetriever | None = None,
+        memory_binding: MemoryRetrievalRequest | None = None,
     ) -> None:
         if dispatcher is not None and agents is not None:
             raise ValueError("dispatcher and agents cannot be provided together")
@@ -90,11 +119,21 @@ class SupervisorAgent(BaseAgent):
         self._integration_executor = AgentExecutor(self._dispatcher)
         self._integration_aggregator = ResultAggregator()
         self._knowledge_gateway = knowledge_gateway
+        self._knowledge_intelligence_port = knowledge_intelligence_port
         self._knowledge_query_builder = (
             knowledge_query_builder
             if knowledge_query_builder is not None
             else KnowledgeQueryBuilder()
         )
+        self._memory_retriever = memory_retriever
+        if memory_binding is None:
+            self._memory_binding = None
+        else:
+            if not isinstance(memory_binding, MemoryRetrievalRequest):
+                raise TypeError("memory_binding must be a MemoryRetrievalRequest")
+            self._memory_binding = MemoryRetrievalRequest.model_validate(
+                copy.deepcopy(memory_binding)
+            )
 
     def run(self, task: AgentTask) -> AgentResult:
         plan: SupervisorPlan | None = None
@@ -102,12 +141,24 @@ class SupervisorAgent(BaseAgent):
         integration_results: tuple[AgentExecutionResult, ...] = ()
         integration_trace: list[IntegrationTraceEvent] = []
         execution_context: ExecutionContext | None = None
+        planning_context: EngineeringPlanningContext | None = None
+        memory_trace: list[SupervisorMemoryTraceEvent] = []
+        fallback_trace: list[SupervisorFallbackTraceEvent] = []
+        knowledge_trace: list[SupervisorKnowledgeTraceEvent] = []
         if not isinstance(task, AgentTask):
-            return self._safe_failure(SupervisorAnalysisError, plan, results)
+            return self._safe_failure(
+                SupervisorAnalysisError,
+                plan,
+                results,
+                memory_trace=memory_trace,
+                fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
+            )
         try:
+            safe_task = self._safe_task(task)
             analyzed = self._analyzer.analyze(
-                task.requirement,
-                metadata=task.model_copy(deep=True).metadata,
+                safe_task.requirement,
+                metadata=safe_task.model_copy(deep=True).metadata,
             )
             if not isinstance(analyzed, SupervisorTask):
                 raise TypeError("analyzer returned an invalid task")
@@ -118,7 +169,7 @@ class SupervisorAgent(BaseAgent):
                 request=analyzed.request,
                 input_context=analyzed.input_context,
             )
-            explicit_agents = "required_agents" in task.metadata
+            explicit_agents = "required_agents" in safe_task.metadata
             selected_agents = self._integration_planner.select_agents(
                 context,
                 required_agents=(
@@ -139,9 +190,137 @@ class SupervisorAgent(BaseAgent):
                 )
             )
         except Exception:
-            return self._safe_failure(SupervisorAnalysisError, plan, results)
+            return self._safe_failure(
+                SupervisorAnalysisError,
+                plan,
+                results,
+                memory_trace=memory_trace,
+                fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
+            )
 
-        if self._knowledge_gateway is not None:
+        ranked_memory_context: RankedMemoryContext | None = None
+        if self._memory_binding is not None:
+            memory_trace.append(
+                SupervisorMemoryTraceEvent(
+                    event="retrieval_attempted",
+                    memory_count=0,
+                )
+            )
+            try:
+                retrieve = getattr(self._memory_retriever, "retrieve", None)
+                if not callable(retrieve):
+                    raise TypeError("memory retriever is unavailable")
+                request = MemoryRetrievalRequest.model_validate(
+                    copy.deepcopy(self._memory_binding)
+                )
+                raw_memory_context = retrieve(request)
+                if not isinstance(raw_memory_context, MemoryContext):
+                    raise TypeError("memory retriever returned an invalid context")
+                checked_memory_context = MemoryContext.model_validate(
+                    copy.deepcopy(raw_memory_context)
+                )
+                ranked_memory_context = self._planning_memory_context(
+                    checked_memory_context
+                )
+                memory_trace.append(
+                    SupervisorMemoryTraceEvent(
+                        event="retrieval_succeeded",
+                        memory_count=len(checked_memory_context.records),
+                    )
+                )
+            except Exception:
+                ranked_memory_context = None
+                memory_trace.append(
+                    SupervisorMemoryTraceEvent(
+                        event="retrieval_failed",
+                        memory_count=0,
+                    )
+                )
+                fallback_trace.extend(
+                    (
+                        SupervisorFallbackTraceEvent(
+                            event="memory_failed",
+                            stage="MemoryUnavailable",
+                            memory_count=0,
+                        ),
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="MemoryUnavailable",
+                            memory_count=0,
+                        ),
+                    )
+                )
+
+        intelligence_knowledge_context: PlanningKnowledgeContext | None = None
+        if self._knowledge_intelligence_port is not None:
+            try:
+                query = self._knowledge_query_builder.build(
+                    analyzed.model_copy(deep=True)
+                )
+                if not isinstance(query, KnowledgeQuery):
+                    raise TypeError("knowledge query builder returned an invalid query")
+                retrieve = getattr(self._knowledge_intelligence_port, "retrieve", None)
+                if not callable(retrieve):
+                    raise TypeError("knowledge intelligence port is unavailable")
+                raw_intelligence = retrieve(
+                    EngineeringKnowledgeRequest(
+                        request_id=safe_task.task_id,
+                        query_summary=query.query,
+                    )
+                )
+                if not isinstance(raw_intelligence, KnowledgeIntelligenceResult):
+                    raise TypeError("knowledge intelligence result is invalid")
+                intelligence = KnowledgeIntelligenceResult.model_validate(
+                    copy.deepcopy(raw_intelligence)
+                )
+                intelligence_knowledge_context = (
+                    self._planning_verified_knowledge_context(
+                        intelligence.verified_evidence
+                    )
+                )
+                knowledge_trace.append(
+                    SupervisorKnowledgeTraceEvent(
+                        sequence=1,
+                        stage="retrieval",
+                        status="success",
+                        count=len(intelligence.verified_evidence),
+                        source_type=self._knowledge_source_summary(
+                            intelligence.verified_evidence
+                        ),
+                    )
+                )
+            except Exception:
+                intelligence_knowledge_context = None
+                knowledge_trace.append(
+                    SupervisorKnowledgeTraceEvent(
+                        sequence=1,
+                        stage="retrieval",
+                        status="failed",
+                        count=0,
+                        source_type="none",
+                    )
+                )
+                memory_count = (
+                    len(ranked_memory_context.records)
+                    if ranked_memory_context is not None
+                    else 0
+                )
+                fallback_trace.extend(
+                    (
+                        SupervisorFallbackTraceEvent(
+                            event="knowledge_failed",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                    )
+                )
+        elif self._knowledge_gateway is not None:
             try:
                 query, gateway_query, before, trace, domains = (
                     self._prepare_knowledge_query(analyzed)
@@ -150,22 +329,113 @@ class SupervisorAgent(BaseAgent):
                 after = copy.deepcopy(gateway_query.model_dump(mode="json"))
                 if after != before:
                     raise ValueError("knowledge gateway modified query")
-                execution_context = self._build_execution_context(
-                    task,
+                candidate_execution_context = self._build_execution_context(
+                    safe_task,
                     query,
                     raw_results,
                     trace,
                     domains,
                 )
-                analyzed = self._planning_task(analyzed, execution_context)
+                candidate_analyzed = self._planning_task(
+                    analyzed,
+                    candidate_execution_context,
+                )
+                execution_context = candidate_execution_context
+                analyzed = candidate_analyzed
             except Exception:
-                return self._safe_failure(SupervisorKnowledgeError, plan, results)
+                if self._memory_binding is None:
+                    return self._safe_failure(
+                        SupervisorKnowledgeError,
+                        plan,
+                        results,
+                        memory_trace=memory_trace,
+                        fallback_trace=fallback_trace,
+                        knowledge_trace=knowledge_trace,
+                    )
+                execution_context = None
+                memory_count = (
+                    len(ranked_memory_context.records)
+                    if ranked_memory_context is not None
+                    else 0
+                )
+                fallback_trace.extend(
+                    (
+                        SupervisorFallbackTraceEvent(
+                            event="knowledge_failed",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="KnowledgeUnavailable",
+                            memory_count=memory_count,
+                        ),
+                    )
+                )
+
+        if (
+            self._memory_binding is not None
+            or self._knowledge_intelligence_port is not None
+        ):
+            try:
+                planning_context = build_engineering_planning_context(
+                    knowledge_context=(
+                        intelligence_knowledge_context
+                        if self._knowledge_intelligence_port is not None
+                        else self._planning_knowledge_context(execution_context)
+                    ),
+                    memory_context=ranked_memory_context,
+                )
+            except Exception:
+                planning_context = None
+                fallback_trace.extend(
+                    (
+                        SupervisorFallbackTraceEvent(
+                            event="fusion_failed",
+                            stage="FusionUnavailable",
+                            memory_count=0,
+                        ),
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="FusionUnavailable",
+                            memory_count=0,
+                        ),
+                    )
+                )
 
         try:
-            planned = self._planner.plan(analyzed.model_copy(deep=True))
-            if not isinstance(planned, SupervisorPlan):
-                raise TypeError("planner returned an invalid plan")
-            plan = SupervisorPlan.model_validate(planned.model_dump(mode="json"))
+            plan_with_context = getattr(self._planner, "plan_with_context", None)
+            if planning_context is not None and callable(plan_with_context):
+                try:
+                    plan = self._checked_plan(
+                        plan_with_context(
+                            analyzed.model_copy(deep=True),
+                            planning_context.model_copy(deep=True),
+                        )
+                    )
+                except Exception:
+                    fallback_trace.append(
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="FusionUnavailable",
+                            memory_count=0,
+                        )
+                    )
+                    plan = self._checked_plan(
+                        self._planner.plan(analyzed.model_copy(deep=True))
+                    )
+            else:
+                if planning_context is not None:
+                    fallback_trace.append(
+                        SupervisorFallbackTraceEvent(
+                            event="fallback_used",
+                            stage="FusionUnavailable",
+                            memory_count=0,
+                        )
+                    )
+                plan = self._checked_plan(
+                    self._planner.plan(analyzed.model_copy(deep=True))
+                )
             if execution_context is not None:
                 integration_trace.append(
                     IntegrationTraceEvent(
@@ -187,19 +457,33 @@ class SupervisorAgent(BaseAgent):
                     )
                 )
         except Exception:
-            return self._safe_failure(SupervisorPlanningError, plan, results)
+            return self._safe_failure(
+                SupervisorPlanningError,
+                plan,
+                results,
+                memory_trace=memory_trace,
+                fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
+            )
 
         try:
             dispatched, integration_results = (
-                self._integration_executor.execute_with_results(
-                    task.model_copy(deep=True),
+                    self._integration_executor.execute_with_results(
+                    safe_task.model_copy(deep=True),
                     plan.model_copy(deep=True),
                     execution_context=execution_context,
                 )
             )
             results = list(dispatched)
         except Exception:
-            return self._safe_failure(SupervisorDispatchError, plan, results)
+            return self._safe_failure(
+                SupervisorDispatchError,
+                plan,
+                results,
+                memory_trace=memory_trace,
+                fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
+            )
 
         try:
             aggregated = self._aggregator.aggregate(
@@ -214,7 +498,7 @@ class SupervisorAgent(BaseAgent):
             if execution_context is not None:
                 report = self._with_trace(report, execution_context, results)
             engineering_context = EngineeringContext(
-                request=task.requirement,
+                request=safe_task.requirement,
                 input_context=analyzed.input_context,
                 knowledge_context=(
                     execution_context.knowledge_context
@@ -229,21 +513,123 @@ class SupervisorAgent(BaseAgent):
                 trace=engineering_context.trace,
             )
         except Exception:
-            return self._safe_failure(SupervisorAggregationError, plan, results)
+            return self._safe_failure(
+                SupervisorAggregationError,
+                plan,
+                results,
+                memory_trace=memory_trace,
+                fallback_trace=fallback_trace,
+                knowledge_trace=knowledge_trace,
+            )
 
+        metadata: dict[str, object] = {
+            "supervisor_plan": plan.model_dump(mode="json"),
+            "agent_results": [
+                result.model_dump(mode="json") for result in results
+            ],
+            "execution_summary": report.model_dump(mode="json"),
+            "engineering_report": engineering_report.model_dump(mode="json"),
+        }
+        if memory_trace:
+            metadata["memory_trace"] = [
+                event.model_dump(mode="json") for event in memory_trace
+            ]
+        if fallback_trace:
+            metadata["fallback_trace"] = [
+                event.model_dump(mode="json") for event in fallback_trace
+            ]
+        if knowledge_trace:
+            metadata["knowledge_trace"] = [
+                event.model_dump(mode="json") for event in knowledge_trace
+            ]
         return AgentResult(
             agent_name=self.name,
             status=(AgentStatus.ERROR if report.failed else AgentStatus.SUCCESS),
             output=report.model_dump_json(),
-            metadata={
-                "supervisor_plan": plan.model_dump(mode="json"),
-                "agent_results": [
-                    result.model_dump(mode="json") for result in results
-                ],
-                "execution_summary": report.model_dump(mode="json"),
-                "engineering_report": engineering_report.model_dump(mode="json"),
-            },
+            metadata=metadata,
         )
+
+    @staticmethod
+    def _safe_task(value: AgentTask) -> AgentTask:
+        isolated = value.model_copy(deep=True)
+        metadata = dict(isolated.metadata)
+        missing_context = object()
+        input_context = metadata.pop(_CONTEXT_KEY, missing_context)
+        safe_metadata = project_safe_supervisor_metadata(metadata)
+        if input_context is not missing_context:
+            safe_metadata[_CONTEXT_KEY] = input_context
+        return isolated.model_copy(update={"metadata": safe_metadata}, deep=True)
+
+    @staticmethod
+    def _checked_plan(value: object) -> SupervisorPlan:
+        if not isinstance(value, SupervisorPlan):
+            raise TypeError("planner returned an invalid plan")
+        return SupervisorPlan.model_validate(value.model_dump(mode="json"))
+
+    @staticmethod
+    def _planning_memory_context(value: MemoryContext) -> RankedMemoryContext:
+        items = tuple(
+            RankedMemoryItem(
+                record_id=item.record_id,
+                memory_type=item.memory_type,
+                logical_key=item.logical_key,
+                ranking=item.ranking,
+            )
+            for item in value.evidence
+        )
+        return build_memory_context(
+            items,
+            evidence=value.evidence,
+        )
+
+    @staticmethod
+    def _planning_knowledge_context(
+        execution_context: ExecutionContext | None,
+    ) -> PlanningKnowledgeContext | None:
+        if execution_context is None:
+            return None
+        sources: list[PlanningKnowledgeEvidence] = []
+        for document in execution_context.knowledge_context.retrieved_documents:
+            projected = project_result(document)
+            sources.append(
+                PlanningKnowledgeEvidence(
+                    source_id=projected.source_id,
+                    source_type=projected.source_type,
+                    reference=projected.source_id,
+                    trust_level=0.5,
+                )
+            )
+        return PlanningKnowledgeContext(sources=tuple(sources))
+
+    @staticmethod
+    def _planning_verified_knowledge_context(
+        evidence: tuple[VerifiedKnowledgeEvidence, ...],
+    ) -> PlanningKnowledgeContext:
+        sources = tuple(
+            PlanningKnowledgeEvidence(
+                source_id=item.evidence_id,
+                source_type=item.provenance[0].source_type,
+                reference=item.provenance[0].reference,
+                trust_level=1.0,
+            )
+            for item in evidence
+        )
+        return PlanningKnowledgeContext(sources=sources)
+
+    @staticmethod
+    def _knowledge_source_summary(
+        evidence: tuple[VerifiedKnowledgeEvidence, ...],
+    ) -> str:
+        source_types = {
+            provenance.source_type.value
+            for item in evidence
+            for provenance in item.provenance
+        }
+        if not source_types:
+            return "none"
+        if len(source_types) == 1:
+            return next(iter(source_types))
+        return "mixed"
 
     def _prepare_knowledge_query(
         self,
@@ -434,6 +820,10 @@ class SupervisorAgent(BaseAgent):
         error_type: type[SupervisorIntelligenceError],
         plan: SupervisorPlan | None,
         results: list[AgentResult],
+        *,
+        memory_trace: list[SupervisorMemoryTraceEvent] | None = None,
+        fallback_trace: list[SupervisorFallbackTraceEvent] | None = None,
+        knowledge_trace: list[SupervisorKnowledgeTraceEvent] | None = None,
     ) -> AgentResult:
         messages: dict[type[SupervisorIntelligenceError], str] = {
             SupervisorAnalysisError: "supervisor requirement analysis failed",
@@ -442,20 +832,33 @@ class SupervisorAgent(BaseAgent):
             SupervisorDispatchError: "supervisor dispatch failed",
             SupervisorAggregationError: "supervisor aggregation failed",
         }
+        metadata: dict[str, object] = {
+            "supervisor_plan": (
+                plan.model_dump(mode="json") if plan is not None else None
+            ),
+            "agent_results": [
+                result.model_dump(mode="json") for result in results
+            ],
+            "execution_summary": {
+                "status": "error",
+                "error_type": error_type.__name__,
+            },
+        }
+        if memory_trace:
+            metadata["memory_trace"] = [
+                event.model_dump(mode="json") for event in memory_trace
+            ]
+        if fallback_trace:
+            metadata["fallback_trace"] = [
+                event.model_dump(mode="json") for event in fallback_trace
+            ]
+        if knowledge_trace:
+            metadata["knowledge_trace"] = [
+                event.model_dump(mode="json") for event in knowledge_trace
+            ]
         return AgentResult(
             agent_name=cls.name,
             status=AgentStatus.ERROR,
             output=messages[error_type],
-            metadata={
-                "supervisor_plan": (
-                    plan.model_dump(mode="json") if plan is not None else None
-                ),
-                "agent_results": [
-                    result.model_dump(mode="json") for result in results
-                ],
-                "execution_summary": {
-                    "status": "error",
-                    "error_type": error_type.__name__,
-                },
-            },
+            metadata=metadata,
         )

@@ -16,13 +16,13 @@ def _headings(path: str) -> tuple[str, ...]:
     )
 
 
-def test_project_versions_are_synchronized_to_v039() -> None:
+def test_project_versions_are_synchronized_to_v100() -> None:
     pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
 
-    assert pyproject["project"]["version"] == "0.39.0"
-    assert __version__ == "0.39.0"
-    assert Settings().version == "0.39.0"
-    assert HealthResponse(status="ok", mode="offline").version == "0.39.0"
+    assert pyproject["project"]["version"] == "1.0.0"
+    assert __version__ == "1.0.0"
+    assert Settings().version == "1.0.0"
+    assert HealthResponse(status="ok", mode="offline").version == "1.0.0"
 
 
 def test_readme_has_release_structure_and_required_limitations() -> None:
@@ -30,6 +30,24 @@ def test_readme_has_release_structure_and_required_limitations() -> None:
     expected = (
         "Overview",
         "Architecture",
+        "v0.48 Optimization Layer",
+        "v0.48 Highlights",
+        "v0.47 Hardware Intelligence Layer",
+        "v0.47 Highlights",
+        "v0.46 Architecture",
+        "v0.46 Highlights",
+        "v0.45 Architecture",
+        "v0.45 Highlights",
+        "v0.44 Architecture",
+        "v0.44 Highlights",
+        "v0.43 Architecture",
+        "v0.43 Highlights",
+        "v0.42 Architecture",
+        "v0.42 Highlights",
+        "v0.41 Architecture",
+        "v0.41 Highlights",
+        "v0.40 Architecture",
+        "v0.40 Highlights",
         "Features",
         "Demo",
         "Benchmark",

@@ -1,10 +1,49 @@
-# Embedded Copilot Agent
+# Embedded Copilot v1.0.0
 
-Embedded Copilot Agent v0.39.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
-Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
-边界清晰的 Engineering Copilot。
+Embedded Copilot v1.0.0 是面向嵌入式工程师的 AI Embedded Engineer。项目将
+Multi-Agent workflow、结构化 evidence、知识检索、
+确定性工程投影和人工审核边界组合为离线可测、可追踪的 Engineering Copilot。
+
+Embedded Copilot Agent v0.48.0 及更早版本的历史能力和安全边界仍保留在下文中。
 
 ## Overview
+
+v1.0 Product Layer 将 v0.49–v0.57 Engineering Core 聚合为 caller-owned、无状态的
+单项目 `EngineeringWorkspace`。它提供 `ProjectSession`、Dashboard Projection、
+Engineering Timeline 和 `EngineeringReleaseReport`，但不维护 project registry、store、
+cache 或持久化，也不替代各 Runtime 的执行、Memory、Repository 或 Release lifecycle。
+
+v0.49–v0.57 依次覆盖 Engineering Interface、Requirement/Architecture Intelligence、
+Hardware Engineering、Firmware Engineering、Hardware Validation、Engineering Artifact、
+Engineering Execution、Human Feedback Loop 和 Autonomous Optimization Loop。所有跨层输出
+仍保持 immutable、caller-owned、deterministic，并在执行或变更边界保留人工审核。
+
+v0.48.0 adds a framework-independent, deterministic, proposal-only Optimization
+Layer. It converts typed Hardware Observation projections into bounded
+mathematical candidates, performs deterministic evaluation, and requires Human
+Approval before returning a reviewed immutable result. It provides mathematical
+candidate only behavior: no hardware control, no real tuning, and no measurement
+capability.
+
+v0.47.0 adds a framework-independent, observation-only Hardware Intelligence
+Layer. It combines caller-owned Digital Twin projections, structured Hardware
+Observation values, HIL reference projections, approval-bound Validation
+Projection, and safe Execution Integration into immutable snapshots. It does not
+perform physical hardware control, USB or Serial communication, Flash, Debug,
+real HIL execution, or physical hardware validation.
+
+v0.46.0 adds a framework-independent Execution Integration Layer. It converts a
+successful Agent Execution Snapshot and reviewed Proposal Projection into a
+fingerprinted Execution Plan, binds one exact caller-owned executor, requires a
+typed Human Approval proof, verifies the safe result projection, and returns a
+terminal Execution Snapshot. The production package provides no real executor and
+does not perform Build, Flash, Hardware Debug, Shell, Git, network, filesystem
+mutation, or hardware control.
+
+v0.45.0 新增 framework-independent、human-controlled Human Loop Layer，将 metadata-only
+Engineering Generation Proposal 显式绑定到 Human Review Lifecycle、Feedback Projection、
+Revision Context 和新的 Revision Proposal。该层不自动批准、不修改 Artifact，不调用 Agent 或
+Tool，也不执行 Build、Flash、Hardware Debug、Memory write 或 Knowledge mutation。
 
 系统接收工程需求与 metadata-only 附件描述，由 Supervisor 规划已有领域 Agent，最终返回
 唯一的跨 API 分析结果 `EngineeringReport`。v0.20.0 新增独立 Evaluation Layer、四视图
@@ -43,6 +82,30 @@ receipt 和最小披露权限保存工程记忆候选。只有兼容 Verificatio
 可以推进可信状态；首版仅提供同步线程安全的 InMemory reference Store，不提供真实持久化、
 Agent/LLM/RAG 调用、Tool execution、文件或硬件操作。Workspace Runtime 仍是唯一写边界。
 
+v0.40.0 新增 read-side Memory Intelligence Layer，将 VERIFIED Memory 确定性投影为规划上下文，
+并与 Knowledge Gateway 融合。Memory、Knowledge、Fusion 或 context-aware planning 失败时，
+Supervisor 使用脱敏 trace 安全降级，不绕过既有 Permission、Audit 或 Verification contract。
+
+v0.41.0 新增 read-only Knowledge Intelligence Layer，提供注入式 Web Research/Datasheet Port、
+确定性 Knowledge Verification、带 `KnowledgeProvenance` 的 Verified Evidence、不可变 Knowledge
+Graph Snapshot 和只投影 candidate 的 Memory Bridge。Knowledge Graph 只辅助 Planning，不能生成
+任务、选择 Agent、构造 `SupervisorPlan` 或触发执行。
+
+v0.42.0 新增 planning-only Agent Workflow Layer，将 caller-owned requirement、可信 Context/Risk
+projection、Engineering Planning Agent、Frozen Task DAG、Human Approval、Deterministic Scheduler
+和 Progress Events 组合为确定性的工作流准备边界。该 Runtime 不执行任务，也不调用 Tool、构建、
+Flash、文件写入或硬件控制能力。
+
+v0.43.0 新增 controlled-execution Agent Execution Layer，将显式 Workflow Task projection、精确
+Agent Registry binding、typed Agent boundary、Verification projection 和 fail-safe Execution Snapshot
+组合为受控执行边界。失败执行最多允许一次两阶段人工恢复，不自动重试、不调用 Tool Runtime，
+也不执行 Build、Flash 或 Hardware Debug。
+
+v0.44.0 新增 framework-independent、approval-controlled Engineering Generation Layer，
+将已验证的 Workflow Task 与 Agent Execution Result 显式投影为可审查的工程 Artifact
+Proposal。该层只生成结构化提案和 Approved Artifact Reference，不写入工程文件、不调用
+Tool Runtime，也不执行 Build、Flash、Hardware Debug 或真实 PCB 生成。
+
 当前可分析的领域包括：
 
 - Datasheet analysis
@@ -51,6 +114,26 @@ Agent/LLM/RAG 调用、Tool execution、文件或硬件操作。Workspace Runtim
 - Debug diagnosis
 
 ## Architecture
+
+v1.0 Engineering Core：
+
+```text
+Requirement
+  -> Architecture
+  -> Hardware
+  -> Firmware
+  -> Validation
+  -> Artifact
+  -> Execution
+  -> Feedback
+  -> Optimization
+  -> Engineering Project Report
+```
+
+Product Layer 只聚合各阶段的安全 reference、fingerprint、状态、时间线和决策记录；它不读取
+完整工程 payload，不控制 Supervisor，也不自动调用 Runtime 或修改工程对象。完整流程坚持
+proposal-first、human approval 和 safe execution boundary，不自动制造、不自动修改 PCB，也不提供
+无人值守硬件控制。
 
 ```text
 User / Streamlit
@@ -75,8 +158,289 @@ Synthetic BenchmarkDataset
 它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
 LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
 
+## v0.48 Optimization Layer
+
+```text
+Hardware Observation Projection
+  -> Optimization Plan
+  -> Unverified Optimization Proposal
+  -> Deterministic Evaluation Projection
+  -> Human Approval
+  -> Reviewed Optimization Result
+```
+
+The Optimization Runtime uses exact registry binding and deterministic PID,
+Power, and Performance mathematical models. Proposals remain explicitly
+unverified until deterministic evaluation and Human Approval are complete.
+Approval reviews a mathematical candidate only; it does not execute an action,
+control hardware, perform real tuning, or measure a device.
+
+## v0.48 Highlights
+
+- Optimization Runtime
+- exact registry binding with no fallback
+- PID mathematical candidate projection
+- Power mathematical model
+- Performance mathematical model
+- Deterministic Evaluation Projection
+- Human Approval binding
+- process-local Replay Protection
+- Security Boundary
+
+## v0.47 Hardware Intelligence Layer
+
+```text
+SUCCESS ExecutionSnapshot
+  -> safe Hardware Context Projection
+  -> Digital Twin Boundary
+  -> structured Hardware Observation
+  -> HIL Projection Boundary
+  -> approval-bound Validation Projection
+  -> immutable Hardware Intelligence Snapshot
+```
+
+The Hardware Intelligence Runtime accepts only caller-owned typed projection
+ports. Execution Integration projects safe identifiers from a verified execution
+snapshot without reading artifact bodies. A validated projection is software
+evidence only and is not a claim of physical hardware validation.
+
+## v0.47 Highlights
+
+- Hardware Intelligence Runtime
+- Digital Twin Boundary
+- HIL Projection Boundary
+- Hardware Observation
+- Validation Projection
+- Execution Integration
+- Deterministic fingerprint binding
+- Content-safe progress events
+- Security Boundary
+
+## v0.46 Architecture
+
+```text
+SUCCESS AgentExecutionSnapshot + ProposalProjection
+  -> ExecutionPreparationRequest
+  -> Execution Plan
+  -> exact Executor Registry Boundary
+  -> READY ExecutionSnapshot
+  -> Human Approval Binding
+  -> Controlled Execution Lifecycle
+  -> Verification Projection
+  -> terminal ExecutionSnapshot
+```
+
+Executor selection is explicit and exact. Human Review approval binds the READY
+snapshot and proposal before the process-local single-use execution boundary is
+consumed. Failure paths return sanitized terminal snapshots; invalid contracts,
+binding mismatches, replay, and progress-delivery failures fail closed.
+
+## v0.46 Highlights
+
+- Execution Runtime
+- Executor Registry Boundary
+- Execution Plan
+- Human Approval Binding
+- Controlled Execution Lifecycle
+- Verification Projection
+- Failure Snapshot
+- Replay Protection
+- Progress Event Isolation
+- Security Boundary
+
+## v0.45 Architecture
+
+```text
+Engineering Generation Proposal
+  -> metadata-only Proposal Projection
+  -> Human Review Lifecycle
+  -> APPROVED / CHANGES_REQUESTED / REJECTED
+  -> Feedback Projection
+  -> Revision Context
+  -> Revision Proposal Boundary
+  -> Human Review again
+```
+
+Human Loop Runtime 只处理 typed、fingerprinted projection。人工决策不会执行修改；结构化
+feedback 不被解释为命令，revision 也不会覆盖原始 Artifact，而是形成必须重新进入人工审核的
+新 proposal。Progress event 仅包含状态和 caller-provided timestamp，交付失败时 fail closed。
+
+## v0.45 Highlights
+
+- Human Loop Runtime
+- Human Review Lifecycle
+- Metadata-only Proposal Projection
+- Feedback Projection
+- Revision Context
+- Revision Proposal Boundary
+- Progress Event Isolation
+- Security Boundary
+
+## v0.44 Architecture
+
+```text
+Requirement
+  -> Workflow
+  -> Agent Execution
+  -> Engineering Generation
+  -> Artifact Proposal
+  -> Verification
+  -> Human Approval
+```
+
+Generator 通过显式 Registry capability binding 注入；Runtime 不扫描模块、不自动 fallback，
+也不持有 generator lifecycle。所有 Hardware、Firmware、PCB 与 BOM 输出均为带指纹、待验证、
+待人工审批的结构化 proposal，不代表真实工程文件或硬件结果。
+
+## v0.44 Highlights
+
+- Engineering Generation Runtime
+- Generator Registry Boundary
+- Hardware Design Proposal
+- Firmware Proposal
+- PCB Design Proposal
+- BOM Proposal
+- Artifact Verification Boundary
+- Human Approval Boundary
+- Security Isolation
+
+## v0.43 Architecture
+
+```text
+Workflow Task
+  -> Execution Adapter
+  -> AgentExecutionRequest
+  -> Agent Registry
+  -> Agent Capability Binding
+  -> Agent Execution Boundary
+  -> Verification Projection
+  -> Execution Snapshot
+```
+
+Agent type、execution ID、context references、constraints 和 timestamp 均由调用方显式提供；
+Runtime 不从任务文本推断 Agent，也不持久化 capability port、prompt、reasoning 或 raw output。
+
+## v0.43 Highlights
+
+- Controlled Agent Execution Runtime
+- Explicit Agent Registry Binding
+- Execution Lifecycle State Machine
+- Safe Result Projection
+- Verification Boundary
+- Fail-safe Execution Snapshot
+- Two-phase Human Resume
+- Progress Event Isolation
+- Security Boundary
+
+## v0.42 Architecture
+
+```text
+Requirement Agent Port
+  -> Requirement Specification
+  -> Workflow Context Projection
+  -> Risk Projection Boundary
+  -> Engineering Planning Agent
+  -> Frozen Task DAG
+  -> Human Approval
+  -> Deterministic Scheduler
+  -> Progress Events
+```
+
+`WorkflowContextPort` 是外部 composition boundary；Knowledge、Memory 和未来 Project Context
+adapter 可以在其后组合，但 Workflow Runtime 只接收安全的 `WorkflowContextProjection`。
+Risk 仅供 Planning visibility、人工审批和 progress/reporting 使用，不改变 task priority、
+scheduling order、DAG dependency 或 Agent selection。
+
+## v0.42 Highlights
+
+- Requirement Agent Port
+- Workflow Context Projection
+- Risk Projection Boundary
+- Engineering Planning Agent
+- Frozen Task DAG
+- Human Approval
+- Deterministic Scheduler
+- Progress Events
+- Security Boundary
+
+## v0.41 Architecture
+
+```text
+External Knowledge Source
+  -> Knowledge Candidate Evidence
+  -> Knowledge Verification
+  -> Verified Knowledge Evidence
+  -> Knowledge Graph Projection
+  -> Supervisor Planning Context
+  -> Engineering Memory Bridge
+```
+
+Knowledge 是可选增强来源，不是决策中心。只有 VERIFIED evidence 可以进入 Planning、Graph 或
+Memory Bridge。Graph query 只返回 evidence projection；Memory Bridge 不调用
+`EngineeringMemoryPort.execute()`，永久规则仍由既有 Permission、Audit、Verification 和人工
+审批边界控制。本版本不提供 Neo4j、内置 browser/HTTP transport、自动 PDF 下载、自主搜索循环
+或自动 Memory mutation。
+
+## v0.41 Highlights
+
+- Knowledge Intelligence Runtime
+- Web Research Source Port
+- Datasheet Typed Projection
+- Knowledge Verification
+- Knowledge Provenance
+- Immutable Knowledge Graph Snapshot
+- Memory Bridge Projection
+- Supervisor Verified-only Planning
+
+## v0.40 Architecture
+
+```text
+User
+  |
+  v
+Supervisor Agent
+  |
+  v
+Knowledge Gateway
+  |-- RAG
+  |-- Engineering Memory
+  `-- Context Fusion
+  |
+  v
+Planning Context
+  |
+  v
+Engineering Agents
+  |-- Hardware
+  |-- Firmware
+  |-- PCB
+  `-- Debug
+  |
+  v
+Verification
+  |
+  v
+Runtime Execution
+```
+
+v0.40 的 Engineering Memory 是 read-side enhancement：仅将已验证记忆投影为确定性的
+规划上下文，并与 Knowledge Gateway 结果融合。LLM 和 Agent 不能直接修改 Memory、文件或
+工程状态；Workspace Runtime 仍是唯一文件写边界。
+
+## v0.40 Highlights
+
+- Multi-Agent Engineering Workflow
+- Memory-Augmented Reasoning
+- Knowledge Fusion
+- Failure-safe Supervisor
+- Security Boundary
+- Regression Validation
+
 ## Features
 
+- Caller-owned single-project `EngineeringWorkspace`
+- Immutable `ProjectSession` and deterministic Dashboard Projection
+- Reference-only Engineering Timeline and Engineering Project Report
 - Supervisor-driven Multi-Agent orchestration
 - Local/GitHub Knowledge Provider architecture
 - Metadata-only multimodal input foundation
@@ -88,9 +452,14 @@ LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此�
 - Workspace Runtime provides approval-gated existing-text-file modification under a trusted root.
 - VS Code MCP Integration Layer provides transport-neutral adapters to existing Runtime Ports.
 - Engineering Memory separates CANDIDATE records from deterministic VERIFIED projections.
+- Knowledge Intelligence projects verified evidence, provenance, graph snapshots, and reviewable memory candidates.
 - FastAPI product API and Streamlit engineering workbench
 
 ## Demo
+
+v1.0 的文档化端到端场景见
+[`ESP32-S3 Smart Camera Demo`](docs/demo/esp32-s3-smart-camera.md)。该场景展示从 Requirement
+到 Release Report 的安全投影链，不声称真实构建、烧录、设备测量或硬件验证已经执行。
 
 Streamlit 提供四个视图：
 

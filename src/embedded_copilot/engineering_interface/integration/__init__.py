@@ -1,0 +1,1 @@
+"""Internal typed projection adapters."""

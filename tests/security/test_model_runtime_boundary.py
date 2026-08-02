@@ -11,6 +11,8 @@ ROOT = Path(__file__).parents[2]
 SRC = ROOT / "src" / "embedded_copilot"
 MODEL_RUNTIME = SRC / "model_runtime"
 CONSTRUCTION_ROOT = SRC / "api" / "main.py"
+DEV_CONSTRUCTION_ROOT = SRC / "web_api" / "dev_server.py"
+APPROVED_CONSTRUCTION_ROOTS = (CONSTRUCTION_ROOT, DEV_CONSTRUCTION_ROOT)
 BOUNDARY_PATHS = (
     SRC / "conversation",
     SRC / "experience",
@@ -87,7 +89,7 @@ def test_business_and_api_modules_do_not_import_model_runtime_internals() -> Non
                     assert node.id not in CONCRETE_RUNTIME_NAMES, path
 
 
-def test_only_application_bootstrap_constructs_production_model_runtime() -> None:
+def test_only_approved_composition_roots_construct_model_runtime() -> None:
     callers: list[Path] = []
     for path in _python_files(SRC):
         if path.is_relative_to(MODEL_RUNTIME):
@@ -100,7 +102,7 @@ def test_only_application_bootstrap_constructs_production_model_runtime() -> Non
             ):
                 callers.append(path)
 
-    assert callers == [CONSTRUCTION_ROOT]
+    assert callers == list(APPROVED_CONSTRUCTION_ROOTS)
 
 
 def test_model_request_and_reasoning_port_remain_model_agnostic() -> None:

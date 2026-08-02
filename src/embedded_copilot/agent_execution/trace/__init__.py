@@ -1,0 +1,1 @@
+"""Internal progress trace boundary."""

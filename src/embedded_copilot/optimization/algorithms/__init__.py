@@ -1,0 +1,1 @@
+"""Pure mathematical optimization adapters."""

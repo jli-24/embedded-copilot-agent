@@ -4,11 +4,37 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+
+_WORKTREE_SRC = (Path(__file__).resolve().parents[2] / "src").resolve()
+
+
+def _virtualenv_site_packages() -> tuple[Path, ...]:
+    paths: list[Path] = []
+    for entry in sys.path:
+        if not entry:
+            continue
+        candidate = Path(entry).resolve()
+        if (
+            candidate.name.casefold() != "site-packages"
+            or ".venv" not in {part.casefold() for part in candidate.parts}
+            or not candidate.is_dir()
+            or candidate in paths
+        ):
+            continue
+        paths.append(candidate)
+    if not paths:
+        raise RuntimeError("benchmark subprocess dependency root is unavailable")
+    return tuple(paths)
 
 
 def _environment() -> dict[str, str]:
     environment = dict(os.environ)
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    environment["PYTHONPATH"] = os.pathsep.join(
+        str(path) for path in (_WORKTREE_SRC, *_virtualenv_site_packages())
+    )
     return environment
 
 

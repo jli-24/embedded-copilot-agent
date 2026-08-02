@@ -1,4 +1,49 @@
-# Embedded Copilot Agent v0.19 Architecture
+# Embedded Copilot Agent Architecture
+
+## v0.41 Knowledge Intelligence Layer
+
+```text
+External Knowledge Source
+  -> Knowledge Candidate Evidence
+  -> Knowledge Verification
+  -> Verified Knowledge Evidence + KnowledgeProvenance
+  -> Knowledge Graph Projection
+  -> Supervisor Planning Context
+  -> Engineering Memory Bridge [candidate projection only]
+```
+
+该图表示 evidence 的投影顺序，不表示 Graph 或 Memory Bridge 获得控制权。Supervisor 始终是
+任务选择和路由的唯一所有者；Memory Bridge 是独立的只读 candidate projection。
+
+`KnowledgeIntelligenceRuntime` 是独立、framework-independent、read-only 的增强层，facade
+只公开 `knowledge_port()`。所有输入输出使用 frozen、`extra="forbid"`、tuple-only DTO；Runtime
+不读取系统时钟、不生成 ID，也不缓存或持久化 source、evidence、graph 或 memory candidate。
+
+Web Research 只调用构造期注入的 `WebResearchSourcePort`，每个请求最多一次，不包含 browser、
+HTTP client、crawler、retry loop 或后台任务。Datasheet 路径只消费调用方显式提供的
+`DatasheetRequest`，复用既有 `DatasheetIntelligencePort`，不下载 PDF、不猜测路径、不读取 bytes。
+
+Verification 使用不可变 `SourceTrustCatalog`。无冲突的权威来源允许单源 VERIFIED；Community/Web
+必须由至少两个独立 publisher 提供相同 canonical fact。同一 publisher 的重复结果不能形成多源；
+矛盾事实进入 REVIEW_REQUIRED，未知来源进入 REJECTED。Provider 自报 confidence 不参与信任判断。
+每条 VERIFIED evidence 携带 `KnowledgeProvenance`，记录 source type、publisher、reference、
+verification method、调用方提供的 UTC 时间和固定 verified confidence。
+
+Knowledge Graph 是 Verified Evidence 的纯函数投影。Snapshot 使用 canonical JSON、稳定排序与
+SHA-256 fingerprint；query 只返回 evidence projection。它不生成任务、不选择 Agent、不构造
+`SupervisorPlan`、不调用 Tool，也不触发执行。首版只投影显式 `conflicts` relation，不推断未声明的
+GPIO、电气或时序冲突；不引入 Neo4j、database、JSON persistence 或 mutable global graph。
+
+Memory Bridge 只把 VERIFIED Failure Rule 投影为可审查的 `KnownIssueMemory` candidate 和既有
+`CreateCandidateRequest` binding。它不持有或调用 `EngineeringMemoryPort`，不创建 VERIFIED record，
+不生成 `ApplyVerificationRequest`，也不自动修改永久规则。后续写入仍经过既有 Permission、Audit、
+Verification/Human Approval lifecycle。Workspace Runtime 继续保持唯一文件写边界。
+
+Supervisor 对 Knowledge Intelligence 的依赖是可选的。未注入时保持 v0.40 Knowledge Gateway
+行为；注入后每次 run 最多调用一次 `retrieve()`，并且只有 VERIFIED evidence 可以进入 Planning。
+失败时使用 memory-only 或 empty planning context 安全降级。Agent handoff 不包含 graph snapshot、
+raw evidence、source content、verification body 或 Memory proposal；`knowledge_trace` 仅记录固定的
+sequence、stage、status、count 和 source type。
 
 ## v0.39 Engineering Memory Layer
 

@@ -59,3 +59,21 @@ class MemoryRecordNotFound(EngineeringMemoryError):
 
     def __init__(self) -> None:
         super().__init__("MEMORY_RECORD_NOT_FOUND")
+
+
+class MemoryRetrievalError(EngineeringMemoryError):
+    __slots__ = ()
+
+
+class MemoryRetrievalRequestRejected(MemoryRetrievalError):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("MEMORY_RETRIEVAL_REQUEST_REJECTED")
+
+
+class MemoryRetrievalUnavailable(MemoryRetrievalError):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("MEMORY_RETRIEVAL_UNAVAILABLE")

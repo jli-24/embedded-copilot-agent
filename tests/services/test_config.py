@@ -9,11 +9,11 @@ from embedded_copilot import __version__
 from embedded_copilot.services.config import Settings
 
 
-def test_settings_have_v039_offline_defaults() -> None:
+def test_settings_have_v045_offline_defaults() -> None:
     settings = Settings(_env_file=None)
 
-    assert __version__ == "0.39.0"
-    assert settings.version == "0.39.0"
+    assert __version__ == "1.0.0"
+    assert settings.version == "1.0.0"
     assert settings.runtime_mode == "offline"
     assert settings.chunk_size == 800
     assert settings.chunk_overlap == 100

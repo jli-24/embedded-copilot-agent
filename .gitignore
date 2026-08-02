@@ -2,9 +2,12 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .pytest_tmp/
+.ruff_cache/
 .venv/
 .env
 .data/
 build/
 dist/
+node_modules/
+*.tsbuildinfo
 *.egg-info/
