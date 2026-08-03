@@ -31,3 +31,12 @@ def test_esp32_camera_example_excludes_raw_inputs_and_paths() -> None:
     )
 
     assert all(value not in serialized for value in forbidden)
+
+
+def test_esp32_camera_example_uses_chinese_product_copy() -> None:
+    serialized = create_esp32_camera_example_report().model_dump_json()
+
+    assert "ESP32 Camera 工程审查已完成" in serialized
+    assert "确认电容布局" in serialized
+    assert "检查组件注册" in serialized
+    assert "engineering review completed" not in serialized

@@ -1,37 +1,16 @@
 # Embedded Copilot Agent
 
-Embedded Copilot Agent v0.39.0 是面向嵌入式工程师的可追踪工程分析系统。项目将
-Multi-Agent workflow、结构化 evidence、知识检索、FastAPI 和 Streamlit 组合为离线可测、
-边界清晰的 Engineering Copilot。
+Embedded Copilot Agent v0.39.0 是面向嵌入式工程师的可追踪工程分析系统。项目通过
+LangGraph Multi-Agent workflow、RAG、Tool Calling、结构化 evidence、FastAPI 与 Streamlit，
+把工程需求、领域分析、证据来源和最终 `EngineeringReport` 连接为离线可测、边界清晰、
+可审计的 Engineering Copilot 工作流。
 
-## Overview
+当前 package 与 runtime version literal 为 `v0.39.0`。VS Code MCP Integration Layer 提供
+transport-neutral 工具适配契约；不安装 MCP SDK、不启动 MCP Server，也不修改 FastAPI contract、
+Agent API 或 `EngineeringReport` schema。
 
-系统接收工程需求与 metadata-only 附件描述，由 Supervisor 规划已有领域 Agent，最终返回
-唯一的跨 API 分析结果 `EngineeringReport`。v0.20.0 新增独立 Evaluation Layer、四视图
-Demo、release documentation 和 CI quality gate；不改变已有 Agent workflow 或 API contract。
-
-v0.33.0 新增独立 Workspace Operation Layer，提供可信根快照、严格 diff 验证、外部人工
-审批后的受控修改和无内容审计；不接入 Agent、API、UI、Shell、Git、构建或 IDE 控制。
-
-v0.34.0 新增 VS Code MCP Integration Layer，提供 transport-neutral MCP 工具适配契约；
-不安装 MCP SDK、不启动 MCP Server。Workspace Runtime 保持唯一写入口，变更 proposal
-必须经过同一 Workspace Runtime validation。
-
-v0.35.0 新增 observation-only Embedded Debug Runtime，提供 caller-owned UART、J-Link、
-ST-Link 与 GDB source contract、规范化 Debug Snapshot、telemetry 和无内容 audit；不包含
-真实设备 transport、Flash、reset、寄存器/内存写入、自动调试、Agent、API 或 UI。
-Workspace Runtime 仍是唯一文件写入口。
-
-v0.36.0 新增 deterministic、observation-only Telemetry Intelligence Layer，提供
-caller-owned `DEBUG_RUNTIME`/`MOCK` source contract、带 SHA-256 指纹的 sample 与
-bounded series，以及确定性统计、endpoint trend 和 `unverified` anomaly candidate；
-不包含 PID optimization、automatic tuning、hardware control、Flash、真实 transport、
-后台采集、缓存、持久化或硬件验证。
-
-v0.37.0 新增 security-first Tool Execution Layer，提供 request fingerprint 绑定的权限决策、
-不可变 capability adapter registry、结果规范化和同步双阶段审计；build/test 仅支持显式
-Mock scenario，串口日志只投影一次 Debug Runtime UART snapshot，不包含 Agent 接入、Shell、
-真实构建/测试、Flash、硬件控制或文件写入。Workspace Runtime 仍是唯一文件写入口。
+v0.37.0 新增 security-first Tool Execution Layer，保持 Mock-only build/test、无 Shell、
+无 Flash、无 hardware control 和无文件写入。
 
 v0.38.0 新增 Verification Agent Layer，对 Firmware、Hardware 与 Tool Result 执行确定性
 候选验证。`FAIL` 仅表示当前提案未通过验证规则，不表示已确认真实硬件故障；任一 Checker
@@ -43,25 +22,36 @@ receipt 和最小披露权限保存工程记忆候选。只有兼容 Verificatio
 可以推进可信状态；首版仅提供同步线程安全的 InMemory reference Store，不提供真实持久化、
 Agent/LLM/RAG 调用、Tool execution、文件或硬件操作。Workspace Runtime 仍是唯一写边界。
 
-当前可分析的领域包括：
+## 项目介绍
+
+系统接收工程需求与 metadata-only 附件描述，由 Supervisor 调度现有领域 Agent，并通过
+FastAPI 返回唯一的跨 API 分析结果 `EngineeringReport`。它不是通用聊天机器人，也不替代
+EDA、真实构建、设备调试或人工工程审核。
+
+当前已覆盖的产品分析方向包括：
 
 - Datasheet analysis
 - PCB review
 - Firmware analysis
 - Debug diagnosis
 
-## Architecture
+## 系统架构
 
 ```text
-User / Streamlit
+User
+  -> Streamlit Web
+  -> ProductApiClient
   -> FastAPI
   -> AnalysisService
   -> Supervisor
-  -> Knowledge -> Planning -> Agents
+  -> Knowledge / Planning / Domain Agents
   -> EngineeringReport
 ```
 
-Evaluation 是生产 workflow 外部的同步观察者：
+RAG 通过受控知识边界向 Knowledge Agent 提供检索结果；Runtime Agent 的外部能力只能通过
+Tool Layer 使用。Web 不直接 import 或调用 Runtime Agent implementation。
+
+Evaluation 位于生产 workflow 外部，只消费 synthetic benchmark case 与结构化结果：
 
 ```text
 Synthetic BenchmarkDataset
@@ -69,40 +59,33 @@ Synthetic BenchmarkDataset
   -> injected Supervisor
   -> EngineeringReport
   -> deterministic metrics
-  -> EvaluationReport (JSON / Markdown)
+  -> EvaluationReport
 ```
 
-它不读取附件文件、不扫描目录、不保存 request 或 `AgentResult`，也不创建缓存、索引或
-LLM judge。逐 Agent latency 不可从当前公共边界可靠观测，因此明确标记为 `unavailable`。
+## 核心能力
 
-## Features
-
-- Supervisor-driven Multi-Agent orchestration
+- Supervisor 驱动的 LangGraph Multi-Agent orchestration
+- 基于 RAG 的知识检索与 source citation
+- HardwareAgent、FirmwareAgent、PCBAgent、DebugAgent 领域分析
+- metadata-only 附件输入与类型识别
+- 可追踪的 `EngineeringReport`，保留 `source_agent` 与 `source_id`
+- FastAPI Product API 与 Streamlit 工程工作台
+- 离线 Evaluation metrics 与确定性 Benchmark 投影
+- ProductApiClient 固定中文安全错误映射
+- Coding Runtime：代码结构、构建日志、Diff 与硬件/软件风险候选分析
+- Workspace Runtime：可信根快照、diff 验证、审批后受控写入与无内容审计
+- VS Code MCP Integration Layer：MCP 工具参数/DTO 适配与既有 Runtime Port 调用
 - Local/GitHub Knowledge Provider architecture
 - Metadata-only multimodal input foundation
 - Deterministic PCB and Datasheet evidence parsing
-- Firmware、Hardware、PCB、Debug domain Agents
-- Traceable `EngineeringReport` with `source_agent` and `source_id`
-- Offline Evaluation metrics and deterministic renderers
-- Coding Runtime provides read-only code understanding, static analysis, and build-log analysis.
-- Workspace Runtime provides approval-gated existing-text-file modification under a trusted root.
-- VS Code MCP Integration Layer provides transport-neutral adapters to existing Runtime Ports.
-- Engineering Memory separates CANDIDATE records from deterministic VERIFIED projections.
-- FastAPI product API and Streamlit engineering workbench
+- Engineering Memory：隔离 CANDIDATE 记录与确定性 VERIFIED projection
 
-## Demo
+## Demo 运行
 
-Streamlit 提供四个视图：
-
-- `Overview`：项目定位、workflow 和技术栈
-- `Workbench`：通过 FastAPI 提交需求与附件元信息
-- `Benchmark`：只展示安全的 release evaluation projection，不执行 benchmark
-- `Example Report`：展示经过 schema 验证的 ESP32 Camera 示例报告
-
-启动 API：
+要求 Python 3.11，并先安装项目依赖。启动本地 API：
 
 ```powershell
-python -m uvicorn embedded_copilot.api.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn embedded_copilot.api.main:app --host 127.0.0.1 --port 8765
 ```
 
 启动 Web：
@@ -111,13 +94,34 @@ python -m uvicorn embedded_copilot.api.main:app --host 127.0.0.1 --port 8000
 python -m streamlit run web/app.py --server.address 127.0.0.1 --server.port 8501
 ```
 
-默认地址为 `http://127.0.0.1:8501`。Workbench 只上传文件名、MIME、大小、类型等附件
-元信息；Web 不读取上传内容，也不绕过 FastAPI 调用 Supervisor 或领域 Agent。
+浏览器打开 `http://127.0.0.1:8501`，进入“工程工作台”：
+
+1. 点击 `Load Demo`，载入 ESP32 Camera 中文需求与附件 metadata。
+2. 检查工程需求、附件类型、MIME、`size_bytes` 与 Agent 选择。
+3. 点击 `Analyze`，通过 FastAPI 提交任务。
+4. 使用“刷新”观察 `Queued`、`Running`、`Completed` 状态。
+5. 完成后查看并下载 `EngineeringReport` Markdown。
+
+附件正文不会由 Web 读取；Demo 和上传文件只向 Product API 提交文件名、类型、MIME、大小
+与受控 metadata。Docker Compose 场景通过 `EMBEDDED_COPILOT_API_URL` 将 Web 指向容器内
+API，不改变既有 Docker runtime contract。
+
+## 技术栈
+
+- Python 3.11
+- LangGraph / LangChain
+- RAG / Chroma
+- FastAPI / Pydantic
+- Streamlit
+- pytest / ruff
+
+默认 `runtime_mode=offline`。测试不依赖真实硬件、串口、在线模型或公网；API Key、Token
+和密码只能通过环境配置注入，不得写入仓库。
 
 ## Benchmark
 
-v0.20.0 默认复用 3 个 synthetic end-to-end integration cases，覆盖 ESP32 Camera、
-Firmware/Debug 和 PCB review workflow。内部 Evaluation metrics 包括：
+当前 v0.20.0 deterministic release snapshot 复用 3 个 synthetic end-to-end integration
+cases，覆盖 ESP32 Camera、Firmware/Debug 与 PCB review workflow。指标包括：
 
 - Task Routing Accuracy
 - Agent Success Rate
@@ -125,66 +129,19 @@ Firmware/Debug 和 PCB review workflow。内部 Evaluation metrics 包括：
 - Evidence Traceability
 - Total Execution Latency
 
-质量指标完全由现有 `EngineeringReport` 和 trace 确定性计算。total latency 使用 monotonic
-clock 直接观测；逐 Agent latency 不估算。Dashboard 中的 1/2/3 ms 是 fixed-clock 的
-deterministic contract snapshot，平均值为 2 ms，不代表真实设备或生产性能。
+固定时钟样本为 1/2/3 ms，平均值为 2 ms，仅验证 Evaluation 与 Web 投影 contract，不代表
+生产性能或硬件实时性。当前公共边界无法可靠观测 per-Agent latency，因此明确显示为
+`unavailable`，不估算或补造数据。
 
-运行 Evaluation 和相关回归：
+## 安全边界
 
-```powershell
-python -m pytest tests/evaluation tests/benchmark tests/integration -q
-```
-
-## Installation
-
-要求 Python 3.11。
-
-```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m pip install -e ".[dev]"
-```
-
-默认 `runtime_mode=offline`，测试不需要真实硬件、串口、在线模型或公网。API Key、Token
-和密码只能通过环境配置注入，不得写入仓库。
-
-## Deployment
-
-Docker Compose 同时定义 API 和 Web 服务：
-
-```powershell
-docker compose build
-docker compose config
-docker compose up
-```
-
-- API: `http://127.0.0.1:8000`
-- Health: `http://127.0.0.1:8000/api/v1/health`
-- Web: `http://127.0.0.1:8501`
-
-若本机没有 Docker，只能视为 Dockerfile/compose 静态结构已验证，不能声称容器已成功运行。
-
-## Engineering Design
-
-核心工程边界：
-
-- API Layer 只做 validation、dependency resolution 和 response mapping。
-- `AnalysisService` 是 API 与 Agent workflow 的唯一桥梁。
-- Supervisor 只做分析、规划、调度和聚合，不实现领域知识。
-- Runtime Agent 的外部能力只能通过 Tool/Knowledge boundary。
-- `EngineeringReport` 是分析 API 唯一返回结果，所有工程字段保持 provenance。
-- Evaluation 只调用注入的 Supervisor，并只输出统计、计数、安全 ID 和安全 failure code。
-- Web 只通过 `ProductApiClient` 发起分析，不 import Runtime Agent implementation。
-
-质量检查：
-
-```powershell
-python -m pytest -q
-python -m compileall -q src tests
-ruff check .
-git diff --check
-```
+- Web 只通过 ProductApiClient 调用 FastAPI，不绕过 Product API。
+- ProductApiClient 不向 UI 暴露 request、URL path、token、异常原文或未知服务端 `detail`。
+- connection、timeout、HTTP、invalid JSON 与 schema validation failure 使用固定中文提示。
+- 附件只处理 metadata，不读取正文、不扫描目录、不创建索引。
+- `EngineeringReport` 是分析 API 的唯一结果，工程字段保留 provenance。
+- Evaluation 不保存 request、附件正文或 `AgentResult`，不创建在线 judge。
+- 未经明确授权，不执行文件系统、Shell、串口、编译器或设备操作。
 
 ## Limitations
 
@@ -192,12 +149,9 @@ git diff --check
 - 不自动烧录设备。
 - 不替代 EDA DRC、ERC 或 connectivity verification。
 - 不替代人工审核和真实硬件验证。
-- Datasheet complex table 无可靠结构时安全失败或忽略，不使用 LLM 猜测。
+- Datasheet complex table 缺少可靠结构时安全失败或忽略，不使用 LLM 猜测。
 - PCB/Datasheet parsing 只支持已验证的有限格式和 evidence 范围。
-- Evaluation total latency 是本地进程观测值，不是实时性保证；逐 Agent latency 为
-  `unavailable`。
-- Coding Runtime 不执行构建或 Git、不控制 IDE 或硬件；其硬件/软件输出为未验证候选，需工程师审核。
-- Workspace Runtime 不生成 patch，不执行命令、构建或 Git，也不控制 IDE；所有变更必须绑定
-  已验证 snapshot、proposal 和外部人工审批。
-- VS Code MCP Integration Layer 不包含 MCP SDK、server transport 或真实 VS Code connection；
-  Workspace Runtime 保持唯一写入口。
+- Benchmark 延迟是 deterministic contract snapshot，不是生产性能承诺。
+- Coding Runtime 不写入工程、不执行构建或 Git、不控制 IDE 或硬件；候选结论需要工程师审核。
+- Workspace Runtime 不执行命令、构建、Git、IDE 或 Agent 编排；文件变更必须通过已验证 proposal 与人工审批。
+- VS Code MCP Integration Layer 不包含 MCP SDK、server transport 或真实 VS Code 连接；Workspace Runtime 保持唯一写入口。

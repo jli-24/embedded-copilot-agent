@@ -19,6 +19,8 @@ def test_esp32_camera_demo_is_loaded_from_manifest_metadata_only(
     manifest = load_demo_manifest(Path("demo/esp32_camera/manifest.json"))
 
     assert manifest.id == "synthetic-esp32-camera-product-demo"
+    assert manifest.name == "ESP32 Camera 综合工程审查"
+    assert "分析 ESP32-S3 Camera 设计" in manifest.request
     assert {item.filename for item in manifest.attachments} == {
         "esp32_camera_datasheet.pdf",
         "esp32_camera.kicad_pcb",
@@ -26,3 +28,7 @@ def test_esp32_camera_demo_is_loaded_from_manifest_metadata_only(
         "camera_build.log",
     }
     assert manifest.required_agents == ("hardware", "firmware", "pcb", "debug")
+    assert all(
+        item.size_bytes == (Path("demo/esp32_camera") / item.filename).stat().st_size
+        for item in manifest.attachments
+    )

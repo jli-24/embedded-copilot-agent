@@ -38,10 +38,12 @@ def test_streamlit_experience_loads_workspace_as_the_default_page() -> None:
         "File Intelligence",
         "Datasheet Intelligence",
         "Engineering Context",
+        "Engineering Intelligence",
         "Reasoning Intelligence",
         "Progress",
         "Review",
         "Model Status",
+        "Memory",
     )
 
 

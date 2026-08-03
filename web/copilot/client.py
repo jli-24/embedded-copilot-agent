@@ -197,6 +197,60 @@ class CopilotExperienceClient:
     def get_model_status(self) -> JsonObject:
         return self._request("GET", "/api/v1/copilot/models/status")
 
+    def get_memory_candidates(self) -> JsonObject:
+        return self._request("GET", "/api/memory/candidates")
+
+    def approve_memory(
+        self,
+        *,
+        memory_id: str,
+        candidate_fingerprint: str,
+        reviewer: str,
+        decision: str,
+        reviewed_at: str,
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            "/api/memory/approve",
+            json={
+                "memory_id": memory_id,
+                "candidate_fingerprint": candidate_fingerprint,
+                "reviewer": reviewer,
+                "decision": decision,
+                "reviewed_at": reviewed_at,
+            },
+        )
+
+    def query_intelligence(self, *, project_id: str, question: str) -> JsonObject:
+        return self._request(
+            "POST",
+            "/api/intelligence/query",
+            json={"project_id": project_id, "question": question},
+        )
+
+    def get_intelligence_context(self, project_id: str) -> JsonObject:
+        identifier = project_id.strip()
+        if not identifier:
+            raise ExperienceApiError("Project identity is required.")
+        return self._request("GET", f"/api/intelligence/context/{quote(identifier, safe=':_-.')}")
+
+    def query_reasoning(
+        self,
+        *,
+        recommendation_id: str,
+        mode: str,
+        question: str,
+    ) -> JsonObject:
+        return self._request(
+            "POST",
+            "/api/reasoning/query",
+            json={
+                "recommendation_id": recommendation_id,
+                "mode": mode,
+                "question": question,
+            },
+        )
+
     def record_review(
         self,
         session_id: str,

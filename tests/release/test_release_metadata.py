@@ -28,14 +28,13 @@ def test_project_versions_are_synchronized_to_v039() -> None:
 def test_readme_has_release_structure_and_required_limitations() -> None:
     readme = Path("README.md").read_text(encoding="utf-8")
     expected = (
-        "Overview",
-        "Architecture",
-        "Features",
-        "Demo",
+        "项目介绍",
+        "系统架构",
+        "核心能力",
+        "Demo 运行",
+        "技术栈",
         "Benchmark",
-        "Installation",
-        "Deployment",
-        "Engineering Design",
+        "安全边界",
         "Limitations",
     )
 
@@ -47,6 +46,7 @@ def test_readme_has_release_structure_and_required_limitations() -> None:
             "PCB review",
             "Firmware analysis",
             "Debug diagnosis",
+            "附件正文不会由 Web 读取",
             "不自动修改 PCB",
             "不自动烧录",
             "不替代 EDA DRC",
@@ -65,4 +65,19 @@ def test_v020_release_note_has_required_sections() -> None:
         "Benchmark Results",
         "Known Limitations",
         "Future Roadmap",
+    )
+
+
+def test_v0201_product_readiness_release_note_has_required_sections() -> None:
+    release_path = Path("docs/release/v0.20.1.md")
+
+    assert release_path.is_file()
+    assert _headings(str(release_path)) == (
+        "发布范围",
+        "Web 产品化收尾",
+        "Product API Client 稳定性",
+        "Demo Metadata",
+        "验证",
+        "兼容性与安全边界",
+        "已知限制",
     )

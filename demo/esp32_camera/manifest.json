@@ -1,14 +1,14 @@
 {
   "id": "synthetic-esp32-camera-product-demo",
-  "name": "Synthetic ESP32 Camera Engineering Review",
-  "request": "Review an ESP32-S3 camera design across hardware interfaces, firmware structure, PCB constraints, and a synthetic build failure.",
+  "name": "ESP32 Camera 综合工程审查",
+  "request": "分析 ESP32-S3 Camera 设计的硬件接口、Firmware 结构、PCB 约束与模拟构建失败。",
   "attachments": [
     {
       "id": "demo-datasheet",
       "filename": "esp32_camera_datasheet.pdf",
       "media_type": "document",
       "content_type": "application/pdf",
-      "size_bytes": 384,
+      "size_bytes": 90,
       "metadata": {"category": "document", "format": "pdf"}
     },
     {
@@ -16,7 +16,7 @@
       "filename": "esp32_camera.kicad_pcb",
       "media_type": "eda",
       "content_type": "application/x-kicad-pcb",
-      "size_bytes": 512,
+      "size_bytes": 75,
       "metadata": {"category": "eda", "format": "kicad_pcb"}
     },
     {
@@ -24,7 +24,7 @@
       "filename": "camera_firmware.c",
       "media_type": "source_code",
       "content_type": "text/x-c",
-      "size_bytes": 256,
+      "size_bytes": 112,
       "metadata": {"category": "source_code", "format": "c"}
     },
     {
@@ -32,7 +32,7 @@
       "filename": "camera_build.log",
       "media_type": "log",
       "content_type": "text/plain",
-      "size_bytes": 192,
+      "size_bytes": 80,
       "metadata": {"category": "log", "format": "log"}
     }
   ],

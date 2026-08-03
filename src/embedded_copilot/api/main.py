@@ -16,6 +16,9 @@ from embedded_copilot.api.copilot_routes import (
     WorkspaceService,
     router as copilot_router,
 )
+from embedded_copilot.api.memory_routes import router as memory_router
+from embedded_copilot.api.intelligence_routes import router as intelligence_router
+from embedded_copilot.api.reasoning_routes import router as reasoning_layer_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -49,6 +52,7 @@ from embedded_copilot.reasoning_runtime import (
     ReasoningPort,
     create_reasoning_runtime,
 )
+from embedded_copilot.reasoning import ReasoningService
 from embedded_copilot.multimodal.context import (
     ProcessLocalAttachmentBindingRepository,
 )
@@ -102,6 +106,12 @@ def create_app(
     context_port: EngineeringContextPort | None | _UnsetService = _UNSET_SERVICE,
     reasoning_port: ReasoningPort | None | _UnsetService = _UNSET_SERVICE,
     file_reference_paths: Mapping[tuple[str, str], str | Path] | None = None,
+    memory_port: object | None = None,
+    memory_writer: object | None = None,
+    intelligence_port: object | None = None,
+    intelligence_context_port: object | None = None,
+    reasoning_layer_port: object | None = None,
+    reasoning_input_resolver: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -234,6 +244,16 @@ def create_app(
             application.state.ingestion_errors = runtime.ingestion_errors
         active_analysis = analysis_service or build_analysis_service(active_settings)
         application.state.analysis_service = active_analysis
+        application.state.memory_port = memory_port
+        application.state.memory_writer = memory_writer
+        application.state.intelligence_port = intelligence_port
+        application.state.intelligence_context_port = intelligence_context_port
+        application.state.reasoning_input_resolver = reasoning_input_resolver
+        application.state.reasoning_layer_service = (
+            ReasoningService(reasoning_layer_port)
+            if reasoning_layer_port is not None
+            else None
+        )
         await active_analysis.start()
         try:
             yield
@@ -273,6 +293,16 @@ def create_app(
                     "error": "reasoning_unavailable",
                     "trace_id": request.state.trace_id,
                 },
+            )
+        if request.url.path.endswith("/reasoning/query"):
+            return JSONResponse(
+                status_code=422,
+                content={"error": "REASONING_REQUEST_REJECTED"},
+            )
+        if request.url.path.endswith("/intelligence/query"):
+            return JSONResponse(
+                status_code=422,
+                content={"error": "INTELLIGENCE_QUERY_REJECTED"},
             )
         if request.url.path.endswith("/datasheets/analyze"):
             return JSONResponse(
@@ -317,6 +347,9 @@ def create_app(
     application.include_router(router)
     application.include_router(copilot_router)
     application.include_router(experience_router)
+    application.include_router(memory_router)
+    application.include_router(intelligence_router)
+    application.include_router(reasoning_layer_router)
     return application
 
 
