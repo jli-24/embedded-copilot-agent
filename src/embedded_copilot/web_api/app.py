@@ -6,8 +6,14 @@ from fastapi.responses import JSONResponse
 
 from embedded_copilot.ai_runtime import EngineeringChatPort
 from embedded_copilot.conversation_feedback import ConversationFeedbackPort
+from embedded_copilot.execution import BuildExecutionServicePort
+from embedded_copilot.firmware_agent import FirmwareAgentPort
 from embedded_copilot.web_api.contracts import (
     WebAttachmentProjectionPort,
+    WebBuildApprovalPort,
+    WebBuildResultRepositoryPort,
+    WebFirmwareProposalRepositoryPort,
+    WebObservationProjectionPort,
     WebProjectPreparationPort,
     WebProjectRepositoryPort,
 )
@@ -29,6 +35,12 @@ def create_web_api_app(
     attachment_port: WebAttachmentProjectionPort,
     engineering_chat_port: EngineeringChatPort | None = None,
     feedback_port: ConversationFeedbackPort | None = None,
+    firmware_agent_port: FirmwareAgentPort | None = None,
+    build_execution_port: BuildExecutionServicePort | None = None,
+    build_approval_port: WebBuildApprovalPort | None = None,
+    observation_port: WebObservationProjectionPort | None = None,
+    firmware_repository_port: WebFirmwareProposalRepositoryPort | None = None,
+    build_repository_port: WebBuildResultRepositoryPort | None = None,
 ) -> FastAPI:
     service = WebConsoleService(
         product_port=product_port,
@@ -37,8 +49,14 @@ def create_web_api_app(
         attachment_port=attachment_port,
         engineering_chat_port=engineering_chat_port,
         feedback_port=feedback_port,
+        firmware_agent_port=firmware_agent_port,
+        build_execution_port=build_execution_port,
+        build_approval_port=build_approval_port,
+        observation_port=observation_port,
+        firmware_repository_port=firmware_repository_port,
+        build_repository_port=build_repository_port,
     )
-    application = FastAPI(title="Embedded Copilot Web API", version="1.1.0")
+    application = FastAPI(title="Embedded Copilot Web API", version="1.3.0")
     application.include_router(create_web_router(service))
 
     @application.exception_handler(WebProjectNotFound)

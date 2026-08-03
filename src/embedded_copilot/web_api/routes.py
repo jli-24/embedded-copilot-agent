@@ -6,13 +6,17 @@ from pydantic import ValidationError
 
 from embedded_copilot.ai_runtime import EngineeringResponse
 from embedded_copilot.conversation_feedback import ConversationFeedbackProjection
+from embedded_copilot.firmware_agent import FirmwareProposal
 from embedded_copilot.web_api.models import (
     WebAttachmentMetadataRequest,
     WebAttachmentProjection,
+    WebBuildResultProjection,
+    WebBuildStartRequest,
     WebChatRequest,
     WebChatResponse,
     WebDashboardProjection,
     WebFeedbackRequest,
+    WebFirmwareGenerateRequest,
     WebProjectCreateRequest,
     WebProjectDetail,
     WebProjectReference,
@@ -69,6 +73,22 @@ def create_web_router(service: WebConsoleService) -> APIRouter:
         request: WebFeedbackRequest,
     ) -> ConversationFeedbackProjection:
         return service.project_feedback(request)
+
+    @router.post("/api/firmware/generate", response_model=FirmwareProposal)
+    async def generate_firmware(
+        request: WebFirmwareGenerateRequest,
+    ) -> FirmwareProposal:
+        return await service.generate_firmware(request)
+
+    @router.post("/api/build/start", response_model=WebBuildResultProjection)
+    async def start_build(
+        request: WebBuildStartRequest,
+    ) -> WebBuildResultProjection:
+        return await service.start_build(request)
+
+    @router.get("/api/build/result", response_model=WebBuildResultProjection)
+    def get_build_result(build_id: str) -> WebBuildResultProjection:
+        return service.get_build_result(build_id)
 
     @router.post(
         "/api/projects/{project_id}/attachments",

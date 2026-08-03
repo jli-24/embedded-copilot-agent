@@ -5,7 +5,7 @@ from pathlib import Path
 
 import fitz
 
-from embedded_copilot import __version__
+from embedded_copilot import __runtime_contract_version__
 from embedded_copilot.engineering import config as engineering_config
 from embedded_copilot.engineering.adapter import EngineeringSupervisorAdapter
 from embedded_copilot.engineering.agent_adapters import HardwareAgentInputAdapter
@@ -228,7 +228,7 @@ Pin No. Pin Name Function
             serialized = report.model_dump_json()
             assert "camera_config_t" not in serialized
             assert str(tmp_path) not in serialized
-            assert __version__ == "1.0.0"
+            assert __runtime_contract_version__ == "1.0.0"
         finally:
             await service.close()
 

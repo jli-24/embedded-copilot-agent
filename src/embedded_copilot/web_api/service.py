@@ -18,8 +18,26 @@ from embedded_copilot.conversation_feedback import (
     UserFeedback,
     user_feedback_fingerprint,
 )
+from embedded_copilot.execution import (
+    BuildApproval,
+    BuildExecutionRequest,
+    BuildExecutionServicePort,
+    BuildResult,
+    build_execution_request_fingerprint,
+)
+from embedded_copilot.firmware_agent import (
+    FirmwareAgentPort,
+    FirmwareGenerationRequest,
+    FirmwarePlatform,
+    FirmwareProposal,
+    firmware_generation_request_fingerprint,
+)
 from embedded_copilot.web_api.contracts import (
     WebAttachmentProjectionPort,
+    WebBuildApprovalPort,
+    WebBuildResultRepositoryPort,
+    WebFirmwareProposalRepositoryPort,
+    WebObservationProjectionPort,
     WebProjectPreparationPort,
     WebProjectRepositoryPort,
 )
@@ -33,15 +51,19 @@ from embedded_copilot.web_api.models import (
     WebAttachmentMetadataRequest,
     WebAttachmentProjection,
     WebAttachmentProjectionRequest,
+    WebBuildResultProjection,
+    WebBuildStartRequest,
     WebChatRequest,
     WebChatResponse,
     WebDashboardProjection,
+    WebFeedbackRequest,
+    WebFirmwareGenerateRequest,
     WebProjectCreateRequest,
     WebProjectDetail,
     WebProjectReference,
-    WebFeedbackRequest,
     WebReportProjection,
     WebTimelineProjection,
+    web_build_result_fingerprint,
     web_chat_response_fingerprint,
 )
 from embedded_copilot.web_api.projections import (
@@ -56,8 +78,14 @@ from embedded_copilot.web_api.projections import (
 class WebConsoleService:
     __slots__ = (
         "_attachment",
+        "_build_approval",
+        "_build_execution",
+        "_build_repository",
         "_engineering_chat",
         "_feedback",
+        "_firmware_agent",
+        "_firmware_repository",
+        "_observation",
         "_preparation",
         "_product",
         "_repository",
@@ -72,6 +100,12 @@ class WebConsoleService:
         attachment_port: WebAttachmentProjectionPort,
         engineering_chat_port: EngineeringChatPort | None = None,
         feedback_port: ConversationFeedbackPort | None = None,
+        firmware_agent_port: FirmwareAgentPort | None = None,
+        build_execution_port: BuildExecutionServicePort | None = None,
+        build_approval_port: WebBuildApprovalPort | None = None,
+        observation_port: WebObservationProjectionPort | None = None,
+        firmware_repository_port: WebFirmwareProposalRepositoryPort | None = None,
+        build_repository_port: WebBuildResultRepositoryPort | None = None,
     ) -> None:
         if not isinstance(preparation_port, WebProjectPreparationPort):
             raise TypeError("preparation_port is invalid")
@@ -87,12 +121,54 @@ class WebConsoleService:
             feedback_port, ConversationFeedbackPort
         ):
             raise TypeError("feedback_port is invalid")
+        optional_ports = (
+            firmware_agent_port,
+            build_execution_port,
+            build_approval_port,
+            observation_port,
+            firmware_repository_port,
+            build_repository_port,
+        )
+        if any(item is not None for item in optional_ports) and any(
+            item is None for item in optional_ports
+        ):
+            raise TypeError("v1.3 web ports must be configured together")
+        if firmware_agent_port is not None and not isinstance(
+            firmware_agent_port, FirmwareAgentPort
+        ):
+            raise TypeError("firmware_agent_port is invalid")
+        if build_execution_port is not None and not isinstance(
+            build_execution_port, BuildExecutionServicePort
+        ):
+            raise TypeError("build_execution_port is invalid")
+        if build_approval_port is not None and not isinstance(
+            build_approval_port, WebBuildApprovalPort
+        ):
+            raise TypeError("build_approval_port is invalid")
+        if observation_port is not None and not isinstance(
+            observation_port, WebObservationProjectionPort
+        ):
+            raise TypeError("observation_port is invalid")
+        if firmware_repository_port is not None and not isinstance(
+            firmware_repository_port, WebFirmwareProposalRepositoryPort
+        ):
+            raise TypeError("firmware_repository_port is invalid")
+        if build_repository_port is not None and not isinstance(
+            build_repository_port, WebBuildResultRepositoryPort
+        ):
+            raise TypeError("build_repository_port is invalid")
         self._product = ProductGateway(product_port)
         self._preparation = preparation_port
         self._repository = repository_port
         self._attachment = attachment_port
         self._engineering_chat = engineering_chat_port
         self._feedback = feedback_port
+        self._firmware_agent = firmware_agent_port
+        self._firmware_repository = firmware_repository_port
+        self._build_execution = build_execution_port
+        self._build_approval = build_approval_port
+        self._build_repository = build_repository_port
+        self._observation = observation_port
 
     def create_project(self, request: WebProjectCreateRequest) -> WebProjectReference:
         checked = _copy(request, WebProjectCreateRequest)
@@ -233,6 +309,121 @@ class WebConsoleService:
             return result
         except Exception:
             raise WebDependencyUnavailable("web dependency is unavailable") from None
+
+    async def generate_firmware(
+        self, request: WebFirmwareGenerateRequest
+    ) -> FirmwareProposal:
+        checked = _copy(request, WebFirmwareGenerateRequest)
+        self._require_v13()
+        workspace = self._load(checked.project_id)
+        context = project_engineering_workspace(workspace)
+        values = {
+            "request_id": checked.request_id,
+            "context": context,
+            "knowledge": (),
+            "platform": FirmwarePlatform.ESP_IDF,
+            "requested_at": checked.requested_at,
+        }
+        generated_request = FirmwareGenerationRequest(
+            **values,
+            fingerprint=firmware_generation_request_fingerprint(**values),
+        )
+        try:
+            assert self._firmware_agent is not None
+            assert self._firmware_repository is not None
+            candidate = await self._firmware_agent.generate(
+                generated_request.model_copy(deep=True)
+            )
+            proposal = _copy(candidate, FirmwareProposal)
+            if (
+                proposal.request_id != generated_request.request_id
+                or proposal.project_id != generated_request.context.project_id
+                or proposal.source_context_fingerprint
+                != generated_request.context.fingerprint
+                or proposal.source_workspace_fingerprint
+                != generated_request.context.workspace_fingerprint
+            ):
+                raise WebDependencyUnavailable("web dependency is unavailable")
+            self._firmware_repository.save(
+                proposal.request_id, proposal.model_copy(deep=True)
+            )
+            return proposal
+        except WebRequestRejected:
+            raise
+        except Exception:  # noqa: BLE001 - dependency errors are sanitized
+            raise WebDependencyUnavailable("web dependency is unavailable") from None
+
+    async def start_build(
+        self, request: WebBuildStartRequest
+    ) -> WebBuildResultProjection:
+        checked = _copy(request, WebBuildStartRequest)
+        self._require_v13()
+        try:
+            assert self._firmware_repository is not None
+            assert self._build_execution is not None
+            assert self._build_approval is not None
+            assert self._observation is not None
+            assert self._build_repository is not None
+            proposal = _copy(
+                self._firmware_repository.load(checked.firmware_request_id),
+                FirmwareProposal,
+            )
+            approval = _copy(
+                self._build_approval.resolve(
+                    approval_reference_id=checked.approval_reference_id,
+                    build_id=checked.build_id,
+                    proposal_fingerprint=proposal.fingerprint,
+                ),
+                BuildApproval,
+            )
+            request_values = {
+                "build_id": checked.build_id,
+                "proposal": proposal,
+                "approval": approval,
+                "requested_at": checked.requested_at,
+            }
+            build_request = BuildExecutionRequest(
+                **request_values,
+                fingerprint=build_execution_request_fingerprint(**request_values),
+            )
+            result = _copy(
+                await self._build_execution.execute(
+                    build_request.model_copy(deep=True)
+                ),
+                BuildResult,
+            )
+            observation = self._observation.observe(result.model_copy(deep=True))
+            projection_values = {"result": result, "observation": observation}
+            projection = WebBuildResultProjection(
+                **projection_values,
+                fingerprint=web_build_result_fingerprint(**projection_values),
+            )
+            self._build_repository.save(
+                result.build_id, projection.model_copy(deep=True)
+            )
+            return projection
+        except WebRequestRejected:
+            raise
+        except Exception:  # noqa: BLE001 - dependency errors are sanitized
+            raise WebDependencyUnavailable("web dependency is unavailable") from None
+
+    def get_build_result(self, build_id: str) -> WebBuildResultProjection:
+        _project_id(build_id)
+        self._require_v13()
+        try:
+            assert self._build_repository is not None
+            return _copy(
+                self._build_repository.load(build_id),
+                WebBuildResultProjection,
+            )
+        except WebRequestRejected:
+            raise
+        except Exception:  # noqa: BLE001 - repository errors are sanitized
+            raise WebDependencyUnavailable("web dependency is unavailable") from None
+
+    def _require_v13(self) -> None:
+        if self._firmware_agent is None:
+            raise WebDependencyUnavailable("web dependency is unavailable")
 
     def _load(self, project_id: str):
         _project_id(project_id)

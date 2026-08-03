@@ -19,6 +19,8 @@ from pydantic import (
 )
 
 from embedded_copilot.conversation_feedback import FeedbackType
+from embedded_copilot.engineering_observation import BuildObservationProjection
+from embedded_copilot.execution import BuildResult
 
 _ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
 _TOKEN = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
@@ -250,6 +252,37 @@ class WebFeedbackRequest(_WebModel):
             message=self.message,
             timestamp=self.timestamp,
         )
+
+
+class WebFirmwareGenerateRequest(_WebModel):
+    project_id: str
+    request_id: str
+    requested_at: datetime
+
+    @field_validator("project_id", "request_id")
+    @classmethod
+    def validate_ids(cls, value: object, info) -> str:
+        return _identifier(value, field=info.field_name)
+
+    _requested_at = field_validator("requested_at", mode="before")(
+        lambda value: _http_utc(value, field="requested_at")
+    )
+
+
+class WebBuildStartRequest(_WebModel):
+    build_id: str
+    firmware_request_id: str
+    approval_reference_id: str
+    requested_at: datetime
+
+    @field_validator("build_id", "firmware_request_id", "approval_reference_id")
+    @classmethod
+    def validate_ids(cls, value: object, info) -> str:
+        return _identifier(value, field=info.field_name)
+
+    _requested_at = field_validator("requested_at", mode="before")(
+        lambda value: _http_utc(value, field="requested_at")
+    )
 
 
 class WebAttachmentMetadataRequest(_WebModel):
@@ -648,6 +681,39 @@ class WebChatResponse(_FingerprintModel):
 
 def web_chat_response_fingerprint(**values: object) -> str:
     return _fingerprint("WebChatResponse", **values)
+
+
+class WebBuildResultProjection(_FingerprintModel):
+    result: BuildResult
+    observation: BuildObservationProjection
+
+    @field_validator("result", mode="before")
+    @classmethod
+    def validate_result_type(cls, value: object) -> object:
+        if type(value) is not BuildResult:
+            raise ValueError("typed build result is required")
+        return value
+
+    @field_validator("observation", mode="before")
+    @classmethod
+    def validate_observation_type(cls, value: object) -> object:
+        if type(value) is not BuildObservationProjection:
+            raise ValueError("typed build observation is required")
+        return value
+
+    @model_validator(mode="after")
+    def validate_fingerprint(self) -> WebBuildResultProjection:
+        if (
+            self.observation.observation.source_result_fingerprint
+            != self.result.fingerprint
+        ):
+            raise ValueError("build observation binding mismatch")
+        self._check(web_build_result_fingerprint)
+        return self
+
+
+def web_build_result_fingerprint(**values: object) -> str:
+    return _fingerprint("WebBuildResultProjection", **values)
 
 
 class WebErrorResponse(_WebModel):

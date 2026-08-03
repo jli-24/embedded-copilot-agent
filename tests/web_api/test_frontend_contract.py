@@ -53,3 +53,22 @@ def test_frontend_pipeline_and_actions_are_safe() -> None:
         assert label in actions
     for forbidden in ("FileReader", "arrayBuffer(", ".text(", "base64"):
         assert forbidden not in attachment
+
+
+def test_frontend_exposes_v13_artifact_build_and_observation_projections() -> None:
+    dashboard = Path("frontend/src/pages/ProjectDashboardPage.tsx").read_text(
+        encoding="utf-8"
+    )
+    client = Path("frontend/src/api/client.ts").read_text(encoding="utf-8")
+    components = {
+        path.name
+        for path in Path("frontend/src/components").glob("*.tsx")
+    }
+
+    assert {"ArtifactViewer.tsx", "BuildPanel.tsx", "ObservationTimeline.tsx"} <= components
+    assert "ArtifactViewer" in dashboard
+    assert "BuildPanel" in dashboard
+    assert "ObservationTimeline" in dashboard
+    assert '"/api/firmware/generate"' in client
+    assert '"/api/build/start"' in client
+    assert "dangerouslySetInnerHTML" not in dashboard

@@ -140,3 +140,54 @@ export interface ConversationFeedbackProjection {
   event: EngineeringEventProjection;
   fingerprint: string;
 }
+
+export interface FirmwareSourceFile {
+  logical_path: string;
+  purpose: string;
+  content: string;
+  fingerprint: string;
+}
+
+export interface FirmwareProposal {
+  request_id: string;
+  project_id: string;
+  platform: "ESP_IDF";
+  files: FirmwareSourceFile[];
+  candidate_semantics: "unverified";
+  review_required: true;
+  fingerprint: string;
+}
+
+export type BuildStatus = "SUCCESS" | "FAILED" | "UNAVAILABLE" | "BLOCKED";
+
+export interface BuildResult {
+  build_id: string;
+  project_id: string;
+  proposal_fingerprint: string;
+  status: BuildStatus;
+  diagnostic_codes: string[];
+  symbol_references: string[];
+  observed_at: string;
+  fingerprint: string;
+}
+
+export interface BuildObservationProjection {
+  observation: {
+    observation_type: string;
+    diagnostic_codes: string[];
+    fingerprint: string;
+  };
+  repair: {
+    category: string;
+    suggestion_codes: string[];
+    apply_available: false;
+    fingerprint: string;
+  };
+  fingerprint: string;
+}
+
+export interface WebBuildResultProjection {
+  result: BuildResult;
+  observation: BuildObservationProjection;
+  fingerprint: string;
+}

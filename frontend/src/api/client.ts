@@ -4,9 +4,11 @@ import type {
   DashboardProjection,
   EngineeringChatResponse,
   FeedbackType,
+  FirmwareProposal,
   ProjectReference,
   ReportProjection,
   TimelineProjection,
+  WebBuildResultProjection,
 } from "../types/contracts";
 
 class ApiError extends Error {
@@ -71,4 +73,25 @@ export const api = {
         timestamp: new Date().toISOString(),
       }),
     }),
+  generateFirmware: (projectId: string) =>
+    request<FirmwareProposal>("/api/firmware/generate", {
+      method: "POST",
+      body: JSON.stringify({
+        project_id: projectId,
+        request_id: `firmware-${projectId}`,
+        requested_at: new Date().toISOString(),
+      }),
+    }),
+  startBuild: (proposal: FirmwareProposal) => {
+    const timestamp = new Date().toISOString();
+    return request<WebBuildResultProjection>("/api/build/start", {
+      method: "POST",
+      body: JSON.stringify({
+        build_id: `build-${proposal.project_id}`,
+        firmware_request_id: proposal.request_id,
+        approval_reference_id: `approval-${proposal.project_id}`,
+        requested_at: timestamp,
+      }),
+    });
+  },
 };

@@ -3,19 +3,25 @@ import { Link, useParams } from "react-router-dom";
 
 import { api } from "../api/client";
 import { ActionCenter } from "../components/ActionCenter";
+import { ArtifactViewer } from "../components/ArtifactViewer";
 import { AttachmentPanel } from "../components/AttachmentPanel";
 import { EngineeringPipeline } from "../components/EngineeringPipeline";
+import { BuildPanel } from "../components/BuildPanel";
 import { EngineeringChatPanel } from "../components/EngineeringChatPanel";
 import { ReportViewer } from "../components/ReportViewer";
 import { Timeline } from "../components/Timeline";
+import { ObservationTimeline } from "../components/ObservationTimeline";
 import { Progress } from "../components/ui/Progress";
-import type { DashboardProjection, ReportProjection, TimelineProjection } from "../types/contracts";
+import type { DashboardProjection, FirmwareProposal, ReportProjection, TimelineProjection, WebBuildResultProjection } from "../types/contracts";
 
 export function ProjectDashboardPage() {
   const { projectId = "" } = useParams();
   const [dashboard, setDashboard] = useState<DashboardProjection>();
   const [timeline, setTimeline] = useState<TimelineProjection>();
   const [report, setReport] = useState<ReportProjection>();
+  const [firmware, setFirmware] = useState<FirmwareProposal>();
+  const [build, setBuild] = useState<WebBuildResultProjection>();
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -30,6 +36,23 @@ export function ProjectDashboardPage() {
       .catch(() => active && setError("The safe project projections are unavailable."));
     return () => { active = false; };
   }, [projectId]);
+
+  async function generateFirmware() {
+    setBusy(true);
+    setError("");
+    try { setFirmware(await api.generateFirmware(projectId)); }
+    catch { setError("Firmware proposal generation is unavailable."); }
+    finally { setBusy(false); }
+  }
+
+  async function startBuild() {
+    if (!firmware) return;
+    setBusy(true);
+    setError("");
+    try { setBuild(await api.startBuild(firmware)); }
+    catch { setError("Controlled build execution is unavailable."); }
+    finally { setBusy(false); }
+  }
 
   if (error) return <main className="p-10 text-red-700">{error}</main>;
   if (!dashboard) return <main className="p-10 text-stone-500">Loading engineering projections…</main>;
@@ -50,8 +73,8 @@ export function ProjectDashboardPage() {
         </header>
         <EngineeringPipeline stages={dashboard.stages} />
         <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_360px]">
-          <div className="space-y-8"><EngineeringChatPanel projectId={projectId} /><ReportViewer report={report} /><ActionCenter /></div>
-          <div className="space-y-8"><Timeline timeline={timeline} /><AttachmentPanel projectId={projectId} /></div>
+          <div className="space-y-8"><EngineeringChatPanel projectId={projectId} /><BuildPanel proposal={firmware} build={build} busy={busy} onGenerate={generateFirmware} onBuild={startBuild} /><ArtifactViewer proposal={firmware} /><ReportViewer report={report} /><ActionCenter /></div>
+          <div className="space-y-8"><ObservationTimeline build={build} /><Timeline timeline={timeline} /><AttachmentPanel projectId={projectId} /></div>
         </div>
       </div>
     </main>

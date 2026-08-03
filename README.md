@@ -1,4 +1,4 @@
-# Embedded Copilot v1.0.0
+# Embedded Copilot v1.3.0
 
 Embedded Copilot v1.0.0 是面向嵌入式工程师的 AI Embedded Engineer。项目将
 Multi-Agent workflow、结构化 evidence、知识检索、

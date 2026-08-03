@@ -91,6 +91,37 @@ def test_dev_chat_and_attachment_routes_are_projection_only() -> None:
     )
 
 
+def test_dev_v13_firmware_and_build_are_projection_only() -> None:
+    client = TestClient(app)
+    client.post("/api/projects", json={"requirement": "Camera"})
+    generated = client.post(
+        "/api/firmware/generate",
+        json={
+            "project_id": "demo-project",
+            "request_id": "demo-firmware",
+            "requested_at": NOW.isoformat(),
+        },
+    )
+    started = client.post(
+        "/api/build/start",
+        json={
+            "build_id": "demo-build",
+            "firmware_request_id": "demo-firmware",
+            "approval_reference_id": "demo-approval",
+            "requested_at": NOW.isoformat(),
+        },
+    )
+
+    assert generated.status_code == 200
+    assert generated.json()["candidate_semantics"] == "unverified"
+    assert started.status_code == 200
+    assert started.json()["result"]["status"] == "BLOCKED"
+    assert started.json()["result"]["diagnostic_codes"] == [
+        "BUILD_APPROVAL_REQUIRED"
+    ]
+    assert "command" not in started.text.lower()
+
+
 def test_demo_ports_are_deterministic_and_do_not_mutate_inputs() -> None:
     preparation = DemoPreparationPort()
     product = DemoProductWorkspacePort()

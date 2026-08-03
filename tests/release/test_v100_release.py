@@ -15,10 +15,10 @@ def test_v100_active_release_metadata_is_synchronized() -> None:
     health = HealthResponse(status="ok", mode="offline")
     health_schema = HealthResponse.model_json_schema()
 
-    assert project["version"] == __version__ == Settings().version == "1.0.0"
-    assert health.version == "1.0.0"
-    assert health_schema["properties"]["version"]["const"] == "1.0.0"
-    assert health_schema["properties"]["version"]["default"] == "1.0.0"
+    assert project["version"] == __version__ == Settings().version == "1.3.0"
+    assert health.version == "1.3.0"
+    assert health_schema["properties"]["version"]["const"] == "1.3.0"
+    assert health_schema["properties"]["version"]["default"] == "1.3.0"
 
 
 def test_v100_product_release_documentation_is_prepared() -> None:
