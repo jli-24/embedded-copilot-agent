@@ -1,0 +1,1 @@
+"""Workspace projection tests."""

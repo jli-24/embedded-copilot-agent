@@ -19,6 +19,11 @@ from embedded_copilot.api.copilot_routes import (
 from embedded_copilot.api.memory_routes import router as memory_router
 from embedded_copilot.api.intelligence_routes import router as intelligence_router
 from embedded_copilot.api.reasoning_routes import router as reasoning_layer_router
+from embedded_copilot.api.autonomous_routes import router as autonomous_loop_router
+from embedded_copilot.api.generation_routes import router as generation_router
+from embedded_copilot.api.workspace_routes import router as workspace_router
+from embedded_copilot.api.toolchain_routes import router as toolchain_router
+from embedded_copilot.api.component_routes import router as component_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -112,6 +117,11 @@ def create_app(
     intelligence_context_port: object | None = None,
     reasoning_layer_port: object | None = None,
     reasoning_input_resolver: object | None = None,
+    autonomous_loop_port: object | None = None,
+    generation_port: object | None = None,
+    workspace_snapshot_port: object | None = None,
+    toolchain_snapshot_port: object | None = None,
+    component_recommendation_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -249,6 +259,11 @@ def create_app(
         application.state.intelligence_port = intelligence_port
         application.state.intelligence_context_port = intelligence_context_port
         application.state.reasoning_input_resolver = reasoning_input_resolver
+        application.state.autonomous_loop_port = autonomous_loop_port
+        application.state.generation_port = generation_port
+        application.state.workspace_snapshot_port = workspace_snapshot_port
+        application.state.toolchain_snapshot_port = toolchain_snapshot_port
+        application.state.component_recommendation_port = component_recommendation_port
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -350,6 +365,11 @@ def create_app(
     application.include_router(memory_router)
     application.include_router(intelligence_router)
     application.include_router(reasoning_layer_router)
+    application.include_router(autonomous_loop_router)
+    application.include_router(generation_router)
+    application.include_router(workspace_router)
+    application.include_router(toolchain_router)
+    application.include_router(component_router)
     return application
 
 

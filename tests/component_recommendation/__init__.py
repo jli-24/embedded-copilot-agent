@@ -1,0 +1,1 @@
+"""Component recommendation tests."""
