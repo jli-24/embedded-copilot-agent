@@ -24,6 +24,9 @@ from embedded_copilot.api.generation_routes import router as generation_router
 from embedded_copilot.api.workspace_routes import router as workspace_router
 from embedded_copilot.api.toolchain_routes import router as toolchain_router
 from embedded_copilot.api.component_routes import router as component_router
+from embedded_copilot.api.device_routes import router as device_router
+from embedded_copilot.api.observation_routes import router as observation_router
+from embedded_copilot.api.validation_routes import router as validation_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -122,6 +125,10 @@ def create_app(
     workspace_snapshot_port: object | None = None,
     toolchain_snapshot_port: object | None = None,
     component_recommendation_port: object | None = None,
+    device_snapshot_port: object | None = None,
+    flash_port: object | None = None,
+    observation_snapshot_port: object | None = None,
+    validation_loop_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -264,6 +271,10 @@ def create_app(
         application.state.workspace_snapshot_port = workspace_snapshot_port
         application.state.toolchain_snapshot_port = toolchain_snapshot_port
         application.state.component_recommendation_port = component_recommendation_port
+        application.state.device_snapshot_port = device_snapshot_port
+        application.state.flash_port = flash_port
+        application.state.observation_snapshot_port = observation_snapshot_port
+        application.state.validation_loop_port = validation_loop_port
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -370,6 +381,9 @@ def create_app(
     application.include_router(workspace_router)
     application.include_router(toolchain_router)
     application.include_router(component_router)
+    application.include_router(device_router)
+    application.include_router(observation_router)
+    application.include_router(validation_router)
     return application
 
 

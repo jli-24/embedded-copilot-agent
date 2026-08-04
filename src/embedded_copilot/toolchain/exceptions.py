@@ -17,5 +17,17 @@ class FlashUnavailable(ToolchainError):
     code = "FLASH_UNAVAILABLE"
 
 
+class FlashApprovalRequired(ToolchainError):
+    code = "FLASH_APPROVAL_REQUIRED"
+
+
+class FlashCapabilityRequired(ToolchainError):
+    code = "FLASH_CAPABILITY_REQUIRED"
+
+
+class FlashFailed(ToolchainError):
+    code = "FLASH_FAILED"
+
+
 class RunUnavailable(ToolchainError):
     code = "RUN_UNAVAILABLE"

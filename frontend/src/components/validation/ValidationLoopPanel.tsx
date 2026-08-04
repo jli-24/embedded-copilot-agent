@@ -1,0 +1,4 @@
+import type { ValidationSnapshot } from "../../types/validation";
+export function ValidationLoopPanel({ snapshot, error, loading }: { snapshot: ValidationSnapshot | null; error: string | null; loading: boolean }) {
+  return <section className="panel"><div className="panel-heading"><h2>Validation loop</h2><span className="status-pill status-pending">Read-only</span></div>{loading && <p className="muted">Loading validation state...</p>}{!loading && error && <p className="muted">Validation loop is unavailable.</p>}{!loading && !error && snapshot && <div className="timeline">{[["Build", snapshot.build_status], ["Flash", snapshot.flash_status], ["Observation", snapshot.observation_status], ["Verification", snapshot.verification_status]].map(([label, status]) => <div className="timeline-item" key={label}><span className="timeline-marker" /><div><strong>{label}</strong><p>{status}</p></div></div>)}</div>}</section>;
+}

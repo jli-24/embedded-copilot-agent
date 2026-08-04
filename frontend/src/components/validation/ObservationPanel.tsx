@@ -1,0 +1,4 @@
+import type { ObservationSnapshot } from "../../types/observation";
+export function ObservationPanel({ snapshot, error, loading }: { snapshot: ObservationSnapshot | null; error: string | null; loading: boolean }) {
+  return <section className="panel"><div className="panel-heading"><h2>Observation</h2><span className="status-pill status-pending">Read-only</span></div>{loading && <p className="muted">Loading observation...</p>}{!loading && error && <p className="muted">Observation is unavailable.</p>}{!loading && !error && snapshot && <dl className="runtime-details"><dt>Boot</dt><dd>{snapshot.boot_status}</dd><dt>Firmware</dt><dd>{snapshot.firmware_version}</dd><dt>Health</dt><dd>{snapshot.health_status}</dd>{snapshot.error_summary && <><dt>Summary</dt><dd>{snapshot.error_summary}</dd></>}</dl>}</section>;
+}
