@@ -32,6 +32,8 @@ from embedded_copilot.api.tool_adapter_routes import router as tool_adapter_rout
 from embedded_copilot.api.hardware_v22_routes import router as hardware_v22_router
 from embedded_copilot.api.debug_v23_routes import router as debug_v23_router
 from embedded_copilot.api.optimization_v23_routes import router as optimization_v23_router
+from embedded_copilot.api.firmware_v24_routes import router as firmware_v24_router
+from embedded_copilot.api.hil_v25_routes import router as hil_v25_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -147,6 +149,12 @@ def create_app(
     debug_analysis_port: object | None = None,
     optimization_port: object | None = None,
     optimization_approval_port: object | None = None,
+    firmware_engineering_port: object | None = None,
+    firmware_build_port: object | None = None,
+    firmware_debug_port: object | None = None,
+    hil_validation_port: object | None = None,
+    device_observation_port: object | None = None,
+    hardware_capability_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -306,6 +314,12 @@ def create_app(
         application.state.debug_analysis_port = debug_analysis_port
         application.state.optimization_port = optimization_port
         application.state.optimization_approval_port = optimization_approval_port
+        application.state.firmware_engineering_port = firmware_engineering_port
+        application.state.firmware_build_port = firmware_build_port
+        application.state.firmware_debug_port = firmware_debug_port
+        application.state.hil_validation_port = hil_validation_port
+        application.state.device_observation_port = device_observation_port
+        application.state.hardware_capability_port = hardware_capability_port
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -366,6 +380,16 @@ def create_app(
                 status_code=422,
                 content={"error": "PROPOSAL_REJECTED"},
             )
+        if "/api/firmware/v24/" in request.url.path:
+            return JSONResponse(
+                status_code=422,
+                content={"error": "FIRMWARE_REJECTED"},
+            )
+        if "/api/hil/v25/" in request.url.path:
+            return JSONResponse(
+                status_code=422,
+                content={"error": "HIL_REJECTED"},
+            )
         if request.url.path.endswith("/datasheets/analyze"):
             return JSONResponse(
                 status_code=422,
@@ -425,6 +449,8 @@ def create_app(
     application.include_router(hardware_v22_router)
     application.include_router(debug_v23_router)
     application.include_router(optimization_v23_router)
+    application.include_router(firmware_v24_router)
+    application.include_router(hil_v25_router)
     return application
 
 
