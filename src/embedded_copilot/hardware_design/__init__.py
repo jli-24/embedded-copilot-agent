@@ -17,13 +17,17 @@ from embedded_copilot.hardware_design.evidence import (
     DesignEvidenceSourceType,
 )
 from embedded_copilot.hardware_design.models import (
+    ComponentProjection,
     DesignComponent,
     DesignConnection,
     DesignModule,
+    DesignSourceType,
     GPIOAssignment,
     GPIOAssignmentStatus,
+    HardwareCapabilitySnapshot,
     HardwareDesignBlueprint,
     PowerTree,
+    UnifiedHardwareModel,
 )
 
 __all__ = [
@@ -36,10 +40,14 @@ __all__ = [
     "DesignEvidence",
     "DesignEvidenceSourceType",
     "DesignModule",
+    "DesignSourceType",
     "GPIOAssignment",
     "GPIOAssignmentStatus",
+    "ComponentProjection",
+    "HardwareCapabilitySnapshot",
     "HardwareDesignArtifact",
     "HardwareDesignBlueprint",
     "HardwareBlueprintProjectionAgentAdapter",
     "PowerTree",
+    "UnifiedHardwareModel",
 ]

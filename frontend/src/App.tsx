@@ -38,6 +38,16 @@ import { ToolStatusPanel } from "./components/toolchain/ToolStatusPanel";
 import { BuildExecutionPanel } from "./components/toolchain/BuildExecutionPanel";
 import { FlashExecutionPanel } from "./components/toolchain/FlashExecutionPanel";
 import { DeviceObservationPanel } from "./components/toolchain/DeviceObservationPanel";
+import { fetchHardwareDesign, fetchHardwareReview, HardwareRequestError } from "./api/hardware";
+import type { HardwareReviewProposal, UnifiedHardwareModel } from "./types/hardware";
+import { HardwareDesignPanel } from "./components/hardware/HardwareDesignPanel";
+import { HardwareReviewPanel } from "./components/hardware/HardwareReviewPanel";
+import { fetchDebugAnalysis, DebugRequestError } from "./api/debug";
+import { fetchOptimization, approveOptimization, rejectOptimization, OptimizationRequestError } from "./api/optimization";
+import type { DebugAnalysisSnapshot } from "./types/debug";
+import type { OptimizationProposal } from "./types/optimization";
+import { DebugPanel } from "./components/debug/DebugPanel";
+import { OptimizationPanel } from "./components/optimization/OptimizationPanel";
 
 export default function App() {
   const [projectId, setProjectId] = useState("");
@@ -68,19 +78,29 @@ export default function App() {
   const [toolCapabilitiesError, setToolCapabilitiesError] = useState<string | null>(null);
   const [adapterObservation, setAdapterObservation] = useState<AdapterObservation | null>(null);
   const [adapterObservationError, setAdapterObservationError] = useState<string | null>(null);
+  const [hardwareDesign, setHardwareDesign] = useState<UnifiedHardwareModel | null>(null);
+  const [hardwareDesignError, setHardwareDesignError] = useState<string | null>(null);
+  const [hardwareReview, setHardwareReview] = useState<HardwareReviewProposal[] | null>(null);
+  const [hardwareReviewError, setHardwareReviewError] = useState<string | null>(null);
+  const [debugSnapshot, setDebugSnapshot] = useState<DebugAnalysisSnapshot | null>(null);
+  const [debugError, setDebugError] = useState<string | null>(null);
+  const [optimization, setOptimization] = useState<OptimizationProposal | null>(null);
+  const [optimizationError, setOptimizationError] = useState<string | null>(null);
   async function load() {
     setLoading(true); setError(null); setSnapshot(null); setGeneration(null); setGenerationError(null); setGenerationLoading(false);
     setRuntime(null); setRuntimeError(null); setWorkspace(null); setWorkspaceError(null); setToolchain(null); setToolchainError(null); setComponents(null); setComponentsError(null);
     setDevice(null); setDeviceError(null); setObservation(null); setObservationError(null); setValidation(null); setValidationError(null);
     setV20Snapshot(null); setV20Error(null);
     setToolCapabilities(null); setToolCapabilitiesError(null); setAdapterObservation(null); setAdapterObservationError(null);
+    setHardwareDesign(null); setHardwareDesignError(null); setHardwareReview(null); setHardwareReviewError(null);
+    setDebugSnapshot(null); setDebugError(null); setOptimization(null); setOptimizationError(null);
     try {
       const loop = await fetchAutonomousLoop(projectId);
       setSnapshot(loop); setResourceLoading(true); setGenerationLoading(true);
       const results = await Promise.allSettled([
-        fetchGeneration(projectId), fetchRuntimeStatus(), fetchWorkspace(projectId), fetchToolchain(projectId), fetchComponents(projectId), fetchDevice(projectId), fetchObservation(projectId), fetchValidationLoop(projectId), fetchAutonomousV20(projectId), fetchToolCapability(projectId), fetchToolDevice(projectId),
+        fetchGeneration(projectId), fetchRuntimeStatus(), fetchWorkspace(projectId), fetchToolchain(projectId), fetchComponents(projectId), fetchDevice(projectId), fetchObservation(projectId), fetchValidationLoop(projectId), fetchAutonomousV20(projectId), fetchToolCapability(projectId), fetchToolDevice(projectId), fetchHardwareDesign(projectId), fetchHardwareReview(projectId), fetchDebugAnalysis(projectId), fetchOptimization(projectId),
       ]);
-      const [generationResult, runtimeResult, workspaceResult, toolchainResult, componentsResult, deviceResult, observationResult, validationResult, v20Result, toolCapabilityResult, adapterObservationResult] = results;
+      const [generationResult, runtimeResult, workspaceResult, toolchainResult, componentsResult, deviceResult, observationResult, validationResult, v20Result, toolCapabilityResult, adapterObservationResult, hardwareDesignResult, hardwareReviewResult, debugResult, optimizationResult] = results;
       if (generationResult.status === "fulfilled") setGeneration(generationResult.value);
       else setGenerationError(generationResult.reason instanceof GenerationRequestError ? generationResult.reason.code : "GENERATION_UNAVAILABLE");
       if (runtimeResult.status === "fulfilled") setRuntime(runtimeResult.value);
@@ -103,6 +123,14 @@ export default function App() {
       else setToolCapabilitiesError(toolCapabilityResult.reason instanceof ToolAdapterRequestError ? toolCapabilityResult.reason.code : "TOOL_UNAVAILABLE");
       if (adapterObservationResult.status === "fulfilled") setAdapterObservation(adapterObservationResult.value);
       else setAdapterObservationError(adapterObservationResult.reason instanceof ToolAdapterRequestError ? adapterObservationResult.reason.code : "OBSERVATION_UNAVAILABLE");
+      if (hardwareDesignResult.status === "fulfilled") setHardwareDesign(hardwareDesignResult.value);
+      else setHardwareDesignError(hardwareDesignResult.reason instanceof HardwareRequestError ? hardwareDesignResult.reason.code : "HARDWARE_UNAVAILABLE");
+      if (hardwareReviewResult.status === "fulfilled") setHardwareReview(hardwareReviewResult.value);
+      else setHardwareReviewError(hardwareReviewResult.reason instanceof HardwareRequestError ? hardwareReviewResult.reason.code : "REVIEW_UNAVAILABLE");
+      if (debugResult.status === "fulfilled") setDebugSnapshot(debugResult.value);
+      else setDebugError(debugResult.reason instanceof DebugRequestError ? debugResult.reason.code : "DEBUG_UNAVAILABLE");
+      if (optimizationResult.status === "fulfilled") setOptimization(optimizationResult.value);
+      else setOptimizationError(optimizationResult.reason instanceof OptimizationRequestError ? optimizationResult.reason.code : "OPTIMIZATION_UNAVAILABLE");
     }
     catch (reason) {
       setError(reason instanceof AutonomousRequestError ? reason.code : "AUTONOMOUS_UNAVAILABLE");
@@ -110,7 +138,7 @@ export default function App() {
   }
   return <div className="app"><section className="load-bar"><div><p className="eyebrow">Embedded Copilot v1.6</p><h1>Engineering Console</h1></div><form onSubmit={(event) => { event.preventDefault(); void load(); }}><label htmlFor="project-id">Project ID</label><div className="load-controls"><input id="project-id" value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="camera-project" maxLength={96} /><button type="submit" disabled={loading || !projectId.trim()}>{loading ? "Loading..." : "Load snapshot"}</button></div></form></section>
     {error && <section className="safe-state" role="alert"><h2>{error}</h2><p>The autonomous loop snapshot is not available.</p></section>}
-    {!error && snapshot && <><AutonomousLoopPanel snapshot={snapshot} /><GenerationPanel snapshot={generation} error={generationError} loading={generationLoading} /><div className="two-column"><ModelRuntimePanel status={runtime} error={runtimeError} loading={resourceLoading} /><WorkspacePanel snapshot={workspace} error={workspaceError} loading={resourceLoading} /><BuildPanel snapshot={toolchain} error={toolchainError} loading={resourceLoading} /><ToolStatusPanel snapshot={toolCapabilities} error={toolCapabilitiesError} loading={resourceLoading} /><BuildExecutionPanel result={null} error={null} loading={resourceLoading} /><FlashExecutionPanel result={null} error={null} loading={resourceLoading} /><DevicePanel snapshot={device} error={deviceError} loading={resourceLoading} /><DeviceObservationPanel snapshot={adapterObservation} error={adapterObservationError} loading={resourceLoading} /><FlashPanel error={null} loading={resourceLoading} /><ObservationPanel snapshot={observation} error={observationError} loading={resourceLoading} /></div><ValidationLoopPanel snapshot={validation} error={validationError} loading={resourceLoading} /><ComponentRecommendationPanel items={components} error={componentsError} loading={resourceLoading} />{v20Snapshot && <><LoopStagePanel snapshot={v20Snapshot} /><ApprovalPanel snapshot={v20Snapshot} onApprove={v20Snapshot.pending_action ? () => { void approveAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} onReject={v20Snapshot.pending_action ? () => { void rejectAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} /><RepairProposalPanel proposal={null} />{v20Error && <p className="muted">Workflow action is unavailable.</p>}</>}</>}
+    {!error && snapshot && <><AutonomousLoopPanel snapshot={snapshot} /><GenerationPanel snapshot={generation} error={generationError} loading={generationLoading} /><DebugPanel snapshot={debugSnapshot} error={debugError} loading={resourceLoading} /><OptimizationPanel proposal={optimization} error={optimizationError} loading={resourceLoading} onApprove={optimization ? () => { void approveOptimization(optimization).then(setOptimization).catch((reason) => setOptimizationError(reason instanceof OptimizationRequestError ? reason.code : "PROPOSAL_REJECTED")); } : undefined} onReject={optimization ? () => { void rejectOptimization(optimization).then(setOptimization).catch((reason) => setOptimizationError(reason instanceof OptimizationRequestError ? reason.code : "PROPOSAL_REJECTED")); } : undefined} /><div className="two-column"><ModelRuntimePanel status={runtime} error={runtimeError} loading={resourceLoading} /><WorkspacePanel snapshot={workspace} error={workspaceError} loading={resourceLoading} /><BuildPanel snapshot={toolchain} error={toolchainError} loading={resourceLoading} /><ToolStatusPanel snapshot={toolCapabilities} error={toolCapabilitiesError} loading={resourceLoading} /><BuildExecutionPanel result={null} error={null} loading={resourceLoading} /><FlashExecutionPanel result={null} error={null} loading={resourceLoading} /><DevicePanel snapshot={device} error={deviceError} loading={resourceLoading} /><DeviceObservationPanel snapshot={adapterObservation} error={adapterObservationError} loading={resourceLoading} /><FlashPanel error={null} loading={resourceLoading} /><ObservationPanel snapshot={observation} error={observationError} loading={resourceLoading} /></div><HardwareDesignPanel model={hardwareDesign} error={hardwareDesignError} loading={resourceLoading} /><HardwareReviewPanel findings={hardwareReview} error={hardwareReviewError} loading={resourceLoading} /><ValidationLoopPanel snapshot={validation} error={validationError} loading={resourceLoading} /><ComponentRecommendationPanel items={components} error={componentsError} loading={resourceLoading} />{v20Snapshot && <><LoopStagePanel snapshot={v20Snapshot} /><ApprovalPanel snapshot={v20Snapshot} onApprove={v20Snapshot.pending_action ? () => { void approveAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} onReject={v20Snapshot.pending_action ? () => { void rejectAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} /><RepairProposalPanel proposal={null} />{v20Error && <p className="muted">Workflow action is unavailable.</p>}</>}</>}
     {!error && !snapshot && !loading && <section className="empty-state"><h2>Choose a project</h2><p>Load a verified, read-only loop snapshot to inspect its current state.</p></section>}
   </div>;
 }

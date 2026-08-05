@@ -29,6 +29,9 @@ from embedded_copilot.api.observation_routes import router as observation_router
 from embedded_copilot.api.validation_routes import router as validation_router
 from embedded_copilot.api.autonomous_v20_routes import router as autonomous_v20_router
 from embedded_copilot.api.tool_adapter_routes import router as tool_adapter_router
+from embedded_copilot.api.hardware_v22_routes import router as hardware_v22_router
+from embedded_copilot.api.debug_v23_routes import router as debug_v23_router
+from embedded_copilot.api.optimization_v23_routes import router as optimization_v23_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -139,6 +142,11 @@ def create_app(
     tool_adapter_build_port: object | None = None,
     tool_adapter_flash_port: object | None = None,
     tool_adapter_device_port: object | None = None,
+    hardware_design_port: object | None = None,
+    hardware_review_port: object | None = None,
+    debug_analysis_port: object | None = None,
+    optimization_port: object | None = None,
+    optimization_approval_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -293,6 +301,11 @@ def create_app(
         application.state.tool_adapter_build_port = tool_adapter_build_port
         application.state.tool_adapter_flash_port = tool_adapter_flash_port
         application.state.tool_adapter_device_port = tool_adapter_device_port
+        application.state.hardware_design_port = hardware_design_port
+        application.state.hardware_review_port = hardware_review_port
+        application.state.debug_analysis_port = debug_analysis_port
+        application.state.optimization_port = optimization_port
+        application.state.optimization_approval_port = optimization_approval_port
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -347,6 +360,11 @@ def create_app(
             return JSONResponse(
                 status_code=422,
                 content={"error": "INTELLIGENCE_QUERY_REJECTED"},
+            )
+        if "/api/optimization/v23/" in request.url.path:
+            return JSONResponse(
+                status_code=422,
+                content={"error": "PROPOSAL_REJECTED"},
             )
         if request.url.path.endswith("/datasheets/analyze"):
             return JSONResponse(
@@ -404,6 +422,9 @@ def create_app(
     application.include_router(validation_router)
     application.include_router(autonomous_v20_router)
     application.include_router(tool_adapter_router)
+    application.include_router(hardware_v22_router)
+    application.include_router(debug_v23_router)
+    application.include_router(optimization_v23_router)
     return application
 
 
