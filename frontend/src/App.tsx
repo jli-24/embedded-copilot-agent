@@ -32,6 +32,12 @@ import type { AutonomousLoopSnapshotV20 } from "./types/autonomousV20";
 import { LoopStagePanel } from "./components/autonomous/LoopStagePanel";
 import { ApprovalPanel } from "./components/autonomous/ApprovalPanel";
 import { RepairProposalPanel } from "./components/autonomous/RepairProposalPanel";
+import { fetchToolCapability, fetchToolDevice, ToolAdapterRequestError } from "./api/toolAdapter";
+import type { ObservationSnapshot as AdapterObservation, ToolCapabilitySnapshot } from "./types/toolAdapter";
+import { ToolStatusPanel } from "./components/toolchain/ToolStatusPanel";
+import { BuildExecutionPanel } from "./components/toolchain/BuildExecutionPanel";
+import { FlashExecutionPanel } from "./components/toolchain/FlashExecutionPanel";
+import { DeviceObservationPanel } from "./components/toolchain/DeviceObservationPanel";
 
 export default function App() {
   const [projectId, setProjectId] = useState("");
@@ -58,18 +64,23 @@ export default function App() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [v20Snapshot, setV20Snapshot] = useState<AutonomousLoopSnapshotV20 | null>(null);
   const [v20Error, setV20Error] = useState<string | null>(null);
+  const [toolCapabilities, setToolCapabilities] = useState<ToolCapabilitySnapshot | null>(null);
+  const [toolCapabilitiesError, setToolCapabilitiesError] = useState<string | null>(null);
+  const [adapterObservation, setAdapterObservation] = useState<AdapterObservation | null>(null);
+  const [adapterObservationError, setAdapterObservationError] = useState<string | null>(null);
   async function load() {
     setLoading(true); setError(null); setSnapshot(null); setGeneration(null); setGenerationError(null); setGenerationLoading(false);
     setRuntime(null); setRuntimeError(null); setWorkspace(null); setWorkspaceError(null); setToolchain(null); setToolchainError(null); setComponents(null); setComponentsError(null);
     setDevice(null); setDeviceError(null); setObservation(null); setObservationError(null); setValidation(null); setValidationError(null);
     setV20Snapshot(null); setV20Error(null);
+    setToolCapabilities(null); setToolCapabilitiesError(null); setAdapterObservation(null); setAdapterObservationError(null);
     try {
       const loop = await fetchAutonomousLoop(projectId);
       setSnapshot(loop); setResourceLoading(true); setGenerationLoading(true);
       const results = await Promise.allSettled([
-        fetchGeneration(projectId), fetchRuntimeStatus(), fetchWorkspace(projectId), fetchToolchain(projectId), fetchComponents(projectId), fetchDevice(projectId), fetchObservation(projectId), fetchValidationLoop(projectId), fetchAutonomousV20(projectId),
+        fetchGeneration(projectId), fetchRuntimeStatus(), fetchWorkspace(projectId), fetchToolchain(projectId), fetchComponents(projectId), fetchDevice(projectId), fetchObservation(projectId), fetchValidationLoop(projectId), fetchAutonomousV20(projectId), fetchToolCapability(projectId), fetchToolDevice(projectId),
       ]);
-      const [generationResult, runtimeResult, workspaceResult, toolchainResult, componentsResult, deviceResult, observationResult, validationResult, v20Result] = results;
+      const [generationResult, runtimeResult, workspaceResult, toolchainResult, componentsResult, deviceResult, observationResult, validationResult, v20Result, toolCapabilityResult, adapterObservationResult] = results;
       if (generationResult.status === "fulfilled") setGeneration(generationResult.value);
       else setGenerationError(generationResult.reason instanceof GenerationRequestError ? generationResult.reason.code : "GENERATION_UNAVAILABLE");
       if (runtimeResult.status === "fulfilled") setRuntime(runtimeResult.value);
@@ -88,6 +99,10 @@ export default function App() {
       else setValidationError(validationResult.reason instanceof ValidationRequestError ? validationResult.reason.code : "VALIDATION_UNAVAILABLE");
       if (v20Result.status === "fulfilled") setV20Snapshot(v20Result.value);
       else setV20Error(v20Result.reason instanceof AutonomousV20RequestError ? v20Result.reason.code : "AUTONOMOUS_UNAVAILABLE");
+      if (toolCapabilityResult.status === "fulfilled") setToolCapabilities(toolCapabilityResult.value);
+      else setToolCapabilitiesError(toolCapabilityResult.reason instanceof ToolAdapterRequestError ? toolCapabilityResult.reason.code : "TOOL_UNAVAILABLE");
+      if (adapterObservationResult.status === "fulfilled") setAdapterObservation(adapterObservationResult.value);
+      else setAdapterObservationError(adapterObservationResult.reason instanceof ToolAdapterRequestError ? adapterObservationResult.reason.code : "OBSERVATION_UNAVAILABLE");
     }
     catch (reason) {
       setError(reason instanceof AutonomousRequestError ? reason.code : "AUTONOMOUS_UNAVAILABLE");
@@ -95,7 +110,7 @@ export default function App() {
   }
   return <div className="app"><section className="load-bar"><div><p className="eyebrow">Embedded Copilot v1.6</p><h1>Engineering Console</h1></div><form onSubmit={(event) => { event.preventDefault(); void load(); }}><label htmlFor="project-id">Project ID</label><div className="load-controls"><input id="project-id" value={projectId} onChange={(event) => setProjectId(event.target.value)} placeholder="camera-project" maxLength={96} /><button type="submit" disabled={loading || !projectId.trim()}>{loading ? "Loading..." : "Load snapshot"}</button></div></form></section>
     {error && <section className="safe-state" role="alert"><h2>{error}</h2><p>The autonomous loop snapshot is not available.</p></section>}
-    {!error && snapshot && <><AutonomousLoopPanel snapshot={snapshot} /><GenerationPanel snapshot={generation} error={generationError} loading={generationLoading} /><div className="two-column"><ModelRuntimePanel status={runtime} error={runtimeError} loading={resourceLoading} /><WorkspacePanel snapshot={workspace} error={workspaceError} loading={resourceLoading} /><BuildPanel snapshot={toolchain} error={toolchainError} loading={resourceLoading} /><DevicePanel snapshot={device} error={deviceError} loading={resourceLoading} /><FlashPanel error={null} loading={resourceLoading} /><ObservationPanel snapshot={observation} error={observationError} loading={resourceLoading} /></div><ValidationLoopPanel snapshot={validation} error={validationError} loading={resourceLoading} /><ComponentRecommendationPanel items={components} error={componentsError} loading={resourceLoading} />{v20Snapshot && <><LoopStagePanel snapshot={v20Snapshot} /><ApprovalPanel snapshot={v20Snapshot} onApprove={v20Snapshot.pending_action ? () => { void approveAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} onReject={v20Snapshot.pending_action ? () => { void rejectAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} /><RepairProposalPanel proposal={null} />{v20Error && <p className="muted">Workflow action is unavailable.</p>}</>}</>}
+    {!error && snapshot && <><AutonomousLoopPanel snapshot={snapshot} /><GenerationPanel snapshot={generation} error={generationError} loading={generationLoading} /><div className="two-column"><ModelRuntimePanel status={runtime} error={runtimeError} loading={resourceLoading} /><WorkspacePanel snapshot={workspace} error={workspaceError} loading={resourceLoading} /><BuildPanel snapshot={toolchain} error={toolchainError} loading={resourceLoading} /><ToolStatusPanel snapshot={toolCapabilities} error={toolCapabilitiesError} loading={resourceLoading} /><BuildExecutionPanel result={null} error={null} loading={resourceLoading} /><FlashExecutionPanel result={null} error={null} loading={resourceLoading} /><DevicePanel snapshot={device} error={deviceError} loading={resourceLoading} /><DeviceObservationPanel snapshot={adapterObservation} error={adapterObservationError} loading={resourceLoading} /><FlashPanel error={null} loading={resourceLoading} /><ObservationPanel snapshot={observation} error={observationError} loading={resourceLoading} /></div><ValidationLoopPanel snapshot={validation} error={validationError} loading={resourceLoading} /><ComponentRecommendationPanel items={components} error={componentsError} loading={resourceLoading} />{v20Snapshot && <><LoopStagePanel snapshot={v20Snapshot} /><ApprovalPanel snapshot={v20Snapshot} onApprove={v20Snapshot.pending_action ? () => { void approveAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} onReject={v20Snapshot.pending_action ? () => { void rejectAutonomousAction(v20Snapshot.pending_action!.action_id, { action_id: v20Snapshot.pending_action!.action_id, action_fingerprint: v20Snapshot.pending_action!.action_fingerprint, reviewer: "web-reviewer", decided_at: new Date().toISOString() }).then(setV20Snapshot).catch((reason) => setV20Error(reason instanceof AutonomousV20RequestError ? reason.code : "LOOP_REJECTED")); } : undefined} /><RepairProposalPanel proposal={null} />{v20Error && <p className="muted">Workflow action is unavailable.</p>}</>}</>}
     {!error && !snapshot && !loading && <section className="empty-state"><h2>Choose a project</h2><p>Load a verified, read-only loop snapshot to inspect its current state.</p></section>}
   </div>;
 }

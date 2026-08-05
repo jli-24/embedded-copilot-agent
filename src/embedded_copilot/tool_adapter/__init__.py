@@ -1,0 +1,61 @@
+"""Injected, read-only boundaries for embedded tool execution."""
+
+from .contracts import (
+    ToolCapabilitySnapshot,
+    ToolCapabilityStatus,
+    ToolBuildPort,
+    ToolDevicePort,
+    ToolExecutionRequest,
+    ToolExecutionResult,
+    ToolExecutionStatus,
+    ToolFlashPort,
+    ToolStatusPort,
+    ToolType,
+    validate_capability_snapshot,
+    validate_execution_request,
+    validate_execution_result,
+)
+from .exceptions import (
+    BuildApprovalRequired,
+    FlashApprovalRequired,
+    FlashFailed,
+    FlashUnavailable,
+    ObservationUnavailable,
+    ToolAdapterError,
+    ToolUnavailable,
+)
+from .executor import (
+    BuildExecutorPort,
+    DebugExecutorPort,
+    FlashExecutorPort,
+    JLinkExecutorPort,
+    SerialTransportPort,
+)
+
+__all__ = [
+    "BuildApprovalRequired",
+    "BuildExecutorPort",
+    "DebugExecutorPort",
+    "FlashApprovalRequired",
+    "FlashFailed",
+    "FlashExecutorPort",
+    "FlashUnavailable",
+    "ObservationUnavailable",
+    "JLinkExecutorPort",
+    "SerialTransportPort",
+    "ToolAdapterError",
+    "ToolCapabilitySnapshot",
+    "ToolCapabilityStatus",
+    "ToolBuildPort",
+    "ToolDevicePort",
+    "ToolExecutionRequest",
+    "ToolExecutionResult",
+    "ToolExecutionStatus",
+    "ToolFlashPort",
+    "ToolStatusPort",
+    "ToolType",
+    "ToolUnavailable",
+    "validate_capability_snapshot",
+    "validate_execution_request",
+    "validate_execution_result",
+]
