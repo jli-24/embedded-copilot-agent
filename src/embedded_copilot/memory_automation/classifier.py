@@ -21,5 +21,6 @@ def classify_memory(value: VersionMemoryInput) -> MemoryType:
         MemorySourceKind.OPTIMIZATION_RESULT: MemoryType.OPTIMIZATION_RESULT,
         MemorySourceKind.FIRMWARE_ENGINEERING_RESULT: MemoryType.FIRMWARE_ENGINEERING_RESULT,
         MemorySourceKind.HIL_VALIDATION_RESULT: MemoryType.HIL_VALIDATION_RESULT,
+        MemorySourceKind.OPTIMIZATION_ANALYSIS_RESULT: MemoryType.OPTIMIZATION_ANALYSIS_RESULT,
     }
     return mapping.get(checked.source.source_type, MemoryType.CONVERSATION_SUMMARY)
