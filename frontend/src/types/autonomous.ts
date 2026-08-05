@@ -20,6 +20,7 @@ export interface AgentExecutionView {
 export interface ApprovalGateView { status: ViewStatus; reviewer?: string | null; }
 export interface VerificationStatusView { status: ViewStatus; review_required: boolean; }
 export interface RepairLoopView { status: ViewStatus; iteration: number; max_iterations: number; }
+export interface RepairProposal { issue_summary: string; affected_area: string; suggested_change: string; evidence_reference: string; fingerprint: string; }
 export interface AutonomousLoopSnapshot {
   project_id: string;
   status: LoopStatus;

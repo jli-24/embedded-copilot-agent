@@ -27,6 +27,7 @@ from embedded_copilot.api.component_routes import router as component_router
 from embedded_copilot.api.device_routes import router as device_router
 from embedded_copilot.api.observation_routes import router as observation_router
 from embedded_copilot.api.validation_routes import router as validation_router
+from embedded_copilot.api.autonomous_v20_routes import router as autonomous_v20_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -129,6 +130,10 @@ def create_app(
     flash_port: object | None = None,
     observation_snapshot_port: object | None = None,
     validation_loop_port: object | None = None,
+    loop_coordinator_port: object | None = None,
+    approval_gate_port: object | None = None,
+    loop_state_port: object | None = None,
+    memory_automation_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -275,6 +280,10 @@ def create_app(
         application.state.flash_port = flash_port
         application.state.observation_snapshot_port = observation_snapshot_port
         application.state.validation_loop_port = validation_loop_port
+        application.state.loop_coordinator_port = loop_coordinator_port
+        application.state.approval_gate_port = approval_gate_port
+        application.state.loop_state_port = loop_state_port
+        application.state.memory_automation_port = memory_automation_port
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -384,6 +393,7 @@ def create_app(
     application.include_router(device_router)
     application.include_router(observation_router)
     application.include_router(validation_router)
+    application.include_router(autonomous_v20_router)
     return application
 
 
