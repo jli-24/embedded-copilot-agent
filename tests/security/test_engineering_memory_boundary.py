@@ -24,6 +24,11 @@ ROOT_FILES = {
     "fingerprint.py",
     "models.py",
     "ports.py",
+    "projection.py",
+    "contracts.py",
+    "ranking.py",
+    "retrieval.py",
+    "store.py",
     "rules.py",
     "service.py",
 }

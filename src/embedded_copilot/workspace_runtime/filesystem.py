@@ -32,6 +32,10 @@ class FileIdentity:
             ctime_ns=value.st_ctime_ns,
         )
 
+    def stable_key(self) -> tuple[int, int, int, int, int]:
+        """Return identity fields stable across descriptor and path stat calls."""
+        return (self.mode, self.size, self.device, self.inode, self.mtime_ns)
+
 
 @dataclass(frozen=True)
 class DirectoryIdentity:
@@ -67,7 +71,10 @@ def read_workspace_file(root: Path, relative_path: str) -> ValidatedWorkspaceFil
             content = handle.read(MAX_WORKSPACE_FILE_SIZE + 1)
             after = os.fstat(handle.fileno())
             _assert_regular_file(after)
-            if FileIdentity.from_stat(before) != FileIdentity.from_stat(after):
+            if (
+                FileIdentity.from_stat(before).stable_key()
+                != FileIdentity.from_stat(after).stable_key()
+            ):
                 raise WorkspaceFileInvalid("workspace file changed while reading")
             current_parents = _assert_bound_identity(
                 root, path, after, expected_parents
@@ -105,7 +112,7 @@ def assert_workspace_file_identity(
     except OSError:
         raise WorkspaceFileInvalid("workspace file is unavailable") from None
     _assert_regular_file(current)
-    if FileIdentity.from_stat(current) != expected:
+    if FileIdentity.from_stat(current).stable_key() != expected.stable_key():
         raise WorkspaceFileInvalid("workspace file changed")
     _assert_bound_identity(root, path, current, expected_parents)
 
@@ -151,7 +158,10 @@ def _assert_bound_identity(
         current = path.stat(follow_symlinks=False)
     except OSError:
         raise WorkspaceFileInvalid("workspace file is unavailable") from None
-    if FileIdentity.from_stat(current) != FileIdentity.from_stat(expected):
+    if (
+        FileIdentity.from_stat(current).stable_key()
+        != FileIdentity.from_stat(expected).stable_key()
+    ):
         raise WorkspaceFileInvalid("workspace path identity changed")
     return current_parents
 

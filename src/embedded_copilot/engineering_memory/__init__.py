@@ -1,4 +1,5 @@
 from .exceptions import (
+    ApprovedMemoryRejected,
     EngineeringMemoryError,
     EngineeringMemoryRequestRejected,
     MemoryAuditUnavailable,
@@ -8,6 +9,14 @@ from .exceptions import (
     MemoryRevisionConflict,
     MemoryStateTransitionRejected,
     MemoryStoreUnavailable,
+)
+from .contracts import (
+    ApprovalAudit,
+    ApprovedEngineeringMemory,
+    EngineeringMemoryContract,
+    EngineeringMemoryQuery,
+    EngineeringMemoryRetrievalResult,
+    EngineeringMemoryType,
 )
 from .facade import EngineeringMemory
 from .factory import create_engineering_memory
@@ -57,15 +66,24 @@ from .models import (
 )
 from .ports import (
     EngineeringMemoryPort,
+    EngineeringMemoryRetrievalPort,
     EngineeringMemoryStorePort,
     MemoryAuditSink,
     MemoryPermissionPort,
 )
+from .projection import ApprovedMemoryProjection, projection_from_snapshot
+from .retrieval import EngineeringMemoryRetrievalService
+from .store import ApprovedEngineeringMemoryStorePort, InMemoryApprovedEngineeringMemoryStore
 
 __all__ = (
     "AffectedMemoryRecord",
+    "ApprovalAudit",
+    "ApprovedEngineeringMemory",
+    "ApprovedEngineeringMemoryStorePort",
+    "ApprovedMemoryRejected",
     "ApplyHumanApprovalRequest",
     "ApplyVerificationRequest",
+    "ApprovedMemoryProjection",
     "BoardProfileMemory",
     "ComponentMemory",
     "CreateCandidateRequest",
@@ -75,8 +93,14 @@ __all__ = (
     "EngineeringMemoryError",
     "EngineeringMemoryHistoryPage",
     "EngineeringMemoryPort",
+    "EngineeringMemoryContract",
+    "EngineeringMemoryQuery",
     "EngineeringMemoryRecord",
     "EngineeringMemoryRequest",
+    "EngineeringMemoryRetrievalPort",
+    "EngineeringMemoryRetrievalResult",
+    "EngineeringMemoryRetrievalService",
+    "EngineeringMemoryType",
     "EngineeringMemoryRequestRejected",
     "EngineeringMemoryResult",
     "EngineeringMemorySnapshot",
@@ -85,6 +109,7 @@ __all__ = (
     "GetHistoryRequest",
     "GetVerifiedSnapshotRequest",
     "HumanApprovalEvidence",
+    "InMemoryApprovedEngineeringMemoryStore",
     "InterfaceBindingMemory",
     "KnownIssueMemory",
     "KnownIssueSeverity",
@@ -120,4 +145,5 @@ __all__ = (
     "VerificationEvidenceBinding",
     "VerificationHistoryMemory",
     "create_engineering_memory",
+    "projection_from_snapshot",
 )

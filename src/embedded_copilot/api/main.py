@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -35,6 +35,11 @@ from embedded_copilot.api.optimization_v23_routes import router as optimization_
 from embedded_copilot.api.firmware_v24_routes import router as firmware_v24_router
 from embedded_copilot.api.hil_v25_routes import router as hil_v25_router
 from embedded_copilot.api.optimization_v26_routes import router as optimization_v26_router
+from embedded_copilot.api.knowledge_v27_routes import router as knowledge_v27_router
+from embedded_copilot.api.engineering_completion_v28_routes import (
+    router as engineering_completion_v28_router,
+)
+from embedded_copilot.api.multimodal_v29_routes import router as multimodal_v29_router
 from embedded_copilot.api.context_adapters import (
     CopilotContextReferenceResolver,
     CopilotDatasheetContextSource,
@@ -72,11 +77,16 @@ from embedded_copilot.reasoning import ReasoningService
 from embedded_copilot.multimodal.context import (
     ProcessLocalAttachmentBindingRepository,
 )
+from embedded_copilot.memory_automation import (
+    MemoryApplicationService,
+    MemoryServicePort,
+)
 from embedded_copilot.schemas.api import ChatResponse
 from embedded_copilot.schemas.result import ErrorCode, ErrorDetail
 from embedded_copilot.services.config import Settings
 from embedded_copilot.services.experience_runtime import build_experience_runtime
-from embedded_copilot.services.runtime import build_analysis_service, build_runtime
+from embedded_copilot.services.legacy_runtime import build_legacy_runtime
+from embedded_copilot.services.canonical_runtime import build_canonical_runtime
 from embedded_copilot.vision_runtime import (
     VisionPort,
     create_vision_runtime,
@@ -90,6 +100,32 @@ class _UnsetService:
 
 
 _UNSET_SERVICE = _UnsetService()
+
+
+class _LazyVisionPort:
+    __slots__ = ("_factory", "_port")
+
+    def __init__(self, factory: Callable[[], VisionPort]) -> None:
+        self._factory = factory
+        self._port: VisionPort | None = None
+
+    async def analyze(self, request: Any) -> Any:
+        if self._port is None:
+            self._port = self._factory()
+        return await self._port.analyze(request)
+
+
+class _LazyReasoningPort:
+    __slots__ = ("_factory", "_port")
+
+    def __init__(self, factory: Callable[[], ReasoningPort]) -> None:
+        self._factory = factory
+        self._port: ReasoningPort | None = None
+
+    async def analyze(self, request: Any) -> Any:
+        if self._port is None:
+            self._port = self._factory()
+        return await self._port.analyze(request)
 
 
 def _error_response(
@@ -158,6 +194,9 @@ def create_app(
     hardware_capability_port: object | None = None,
     digital_twin_port: object | None = None,
     optimization_analysis_port: object | None = None,
+    knowledge_port: object | None = None,
+    retrieval_port: object | None = None,
+    engineering_completion_port: object | None = None,
 ) -> FastAPI:
     active_settings = settings or Settings()
     model_runtime = create_model_runtime(active_settings)
@@ -171,10 +210,12 @@ def create_app(
         )
         if isinstance(vision_port, _UnsetService):
             active_vision_port: VisionPort | None = (
-                create_vision_runtime(
-                    active_settings,
-                    default_attachment_repository,
-                ).vision_port()
+                _LazyVisionPort(
+                    lambda: create_vision_runtime(
+                        active_settings,
+                        default_attachment_repository,
+                    ).vision_port()
+                )
                 if default_attachment_repository is not None
                 else None
             )
@@ -230,8 +271,10 @@ def create_app(
             active_context_port = context_port
         if isinstance(reasoning_port, _UnsetService):
             active_reasoning_port: ReasoningPort | None = (
-                model_runtime.enhance_reasoning_port(
-                    create_reasoning_runtime().reasoning_port()
+                _LazyReasoningPort(
+                    lambda: model_runtime.enhance_reasoning_port(
+                        create_reasoning_runtime().reasoning_port()
+                    )
                 )
                 if active_context_port is not None
                 else None
@@ -239,7 +282,11 @@ def create_app(
         else:
             active_reasoning_port = reasoning_port
         active_reasoning_service = None
-        if active_context_port is not None and active_reasoning_port is not None:
+        if (
+            active_context_port is not None
+            and active_reasoning_port is not None
+            and isinstance(active_reasoning_port, ReasoningPort)
+        ):
             active_reasoning_service = ContextBackedReasoningService(
                 active_context_port,
                 active_reasoning_port,
@@ -284,12 +331,31 @@ def create_app(
             application.state.copilot_service = service
             application.state.health_status = "ok"
         else:
-            runtime = await asyncio.to_thread(build_runtime, active_settings)
+            runtime = await asyncio.to_thread(
+                build_canonical_runtime, active_settings
+            )
             application.state.copilot_service = runtime.service
             application.state.health_status = runtime.health_status
             application.state.ingestion_errors = runtime.ingestion_errors
-        active_analysis = analysis_service or build_analysis_service(active_settings)
+        active_analysis = analysis_service or build_legacy_runtime(active_settings)
+        active_memory_service: MemoryServicePort | None = None
+        if isinstance(memory_port, MemoryServicePort):
+            active_memory_service = memory_port
+        elif (
+            memory_port is not None
+            and memory_automation_port is not None
+            and memory_writer is not None
+        ):
+            try:
+                active_memory_service = MemoryApplicationService(
+                    candidates=memory_port,
+                    promotion=memory_automation_port,
+                    writer=memory_writer,
+                )
+            except TypeError:
+                active_memory_service = None
         application.state.analysis_service = active_analysis
+        application.state.memory_service = active_memory_service
         application.state.memory_port = memory_port
         application.state.memory_writer = memory_writer
         application.state.intelligence_port = intelligence_port
@@ -325,6 +391,15 @@ def create_app(
         application.state.hardware_capability_port = hardware_capability_port
         application.state.digital_twin_port = digital_twin_port
         application.state.optimization_analysis_port = optimization_analysis_port
+        application.state.knowledge_port = knowledge_port
+        application.state.retrieval_port = retrieval_port
+        application.state.engineering_completion_port = engineering_completion_port
+        application.state.multimodal_vision_port = (
+            vision_port if not isinstance(vision_port, _UnsetService) else None
+        )
+        application.state.multimodal_reasoning_port = (
+            reasoning_port if not isinstance(reasoning_port, _UnsetService) else None
+        )
         application.state.reasoning_layer_service = (
             ReasoningService(reasoning_layer_port)
             if reasoning_layer_port is not None
@@ -397,6 +472,12 @@ def create_app(
             )
         if "/api/digital-twin/v26/" in request.url.path or "/api/optimization/v26/" in request.url.path:
             return JSONResponse(status_code=422, content={"error": "OPTIMIZATION_REJECTED"})
+        if "/api/knowledge/v27/" in request.url.path:
+            return JSONResponse(status_code=422, content={"error": "QUERY_REJECTED"})
+        if "/api/engineering/v28/" in request.url.path:
+            return JSONResponse(status_code=422, content={"error": "QUERY_REJECTED"})
+        if "/api/multimodal/v29/" in request.url.path:
+            return JSONResponse(status_code=422, content={"error": "QUERY_REJECTED"})
         if request.url.path.endswith("/datasheets/analyze"):
             return JSONResponse(
                 status_code=422,
@@ -459,6 +540,9 @@ def create_app(
     application.include_router(firmware_v24_router)
     application.include_router(hil_v25_router)
     application.include_router(optimization_v26_router)
+    application.include_router(knowledge_v27_router)
+    application.include_router(engineering_completion_v28_router)
+    application.include_router(multimodal_v29_router)
     return application
 
 

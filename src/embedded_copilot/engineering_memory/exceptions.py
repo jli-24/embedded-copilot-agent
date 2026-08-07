@@ -59,3 +59,10 @@ class MemoryRecordNotFound(EngineeringMemoryError):
 
     def __init__(self) -> None:
         super().__init__("MEMORY_RECORD_NOT_FOUND")
+
+
+class ApprovedMemoryRejected(EngineeringMemoryError):
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("APPROVED_MEMORY_REJECTED")

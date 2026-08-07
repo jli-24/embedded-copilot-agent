@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 from datetime import UTC, datetime
 
 import httpx
 
 from embedded_copilot.api.main import create_app
 from embedded_copilot.knowledge_writer import KnowledgeWriteResult, KnowledgeWriteStatus
+from embedded_copilot.engineering_memory import ApprovedMemoryProjection
 from embedded_copilot.memory_automation import (
     MemorySourceKind,
     MemorySourceProjection,
@@ -47,6 +50,34 @@ class _Writer:
         )
 
 
+class _Promotion:
+    def promote(self, candidate, approval):
+        material = {
+            "project_id": "project-1",
+            "memory_id": candidate.memory_id,
+            "record_id": "record-1",
+            "memory_type": "ENGINEERING_DECISION",
+            "status": "APPROVED",
+            "source_reference": "conversation:session-1",
+            "source_revision": candidate.fingerprint,
+            "title": "Engineering Decision",
+            "summary": "Approved decision.",
+            "evidence_references": ("conversation:session-1",),
+        }
+        provisional = ApprovedMemoryProjection.model_construct(
+            **material, fingerprint="sha256:" + "0" * 64
+        )
+        encoded = json.dumps(
+            provisional.model_dump(mode="json", exclude={"fingerprint"}),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        return ApprovedMemoryProjection(
+            **material, fingerprint="sha256:" + hashlib.sha256(encoded).hexdigest()
+        )
+
+
 def test_memory_routes_project_and_approve_without_chat_changes() -> None:
     source = MemorySourceProjection(
         source_type=MemorySourceKind.BUILD_OBSERVATION,
@@ -59,6 +90,7 @@ def test_memory_routes_project_and_approve_without_chat_changes() -> None:
         VersionMemoryInput(source=source, summary="Build passed")
     )
     writer = _Writer()
+    promotion = _Promotion()
     app = create_app(
         settings=Settings(_env_file=None),
         service=_Chat(),
@@ -66,6 +98,7 @@ def test_memory_routes_project_and_approve_without_chat_changes() -> None:
         experience_service=None,
         memory_port=_MemoryPort(candidate),
         memory_writer=writer,
+        memory_automation_port=promotion,
     )
 
     async def exercise() -> tuple[httpx.Response, httpx.Response]:
@@ -91,4 +124,3 @@ def test_memory_routes_project_and_approve_without_chat_changes() -> None:
     assert approval.status_code == 200
     assert approval.json()["event_type"] == "MEMORY_CREATED"
     assert writer.calls == 1
-

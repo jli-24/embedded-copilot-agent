@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
+from .contracts import (
+    EngineeringMemoryQuery,
+    EngineeringMemoryRetrievalResult,
+)
 from .models import (
     ApplyHumanApprovalRequest,
     ApplyVerificationRequest,
@@ -75,3 +79,10 @@ class MemoryPermissionPort(Protocol):
 @runtime_checkable
 class MemoryAuditSink(Protocol):
     def record(self, event: MemoryAuditEvent) -> None: ...
+
+
+@runtime_checkable
+class EngineeringMemoryRetrievalPort(Protocol):
+    def query(
+        self, request: EngineeringMemoryQuery
+    ) -> EngineeringMemoryRetrievalResult: ...

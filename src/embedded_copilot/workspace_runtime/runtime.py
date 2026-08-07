@@ -98,7 +98,7 @@ class _SecureFileWritePort:
         current = read_workspace_file(self._root, item.relative_path)
         if (
             current.content != item.before
-            or current.identity != item.identity
+            or current.identity.stable_key() != item.identity.stable_key()
             or current.parent_identities != item.parent_identities
         ):
             raise WorkspaceFileInvalid("workspace file changed")
